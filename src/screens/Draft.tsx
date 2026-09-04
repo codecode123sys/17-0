@@ -1,10 +1,41 @@
-import { SLOTS, openSlots, roundPlayers, targetsFor } from "../engine/draft";
+import { useEffect, useRef, useState } from "react";
+import { ERAS, SLOTS, openSlots, roundPlayers, targetsFor, teamsForEra } from "../engine/draft";
 import { PlayerCard } from "../components/PlayerCard";
 import { TeamBadge } from "../components/TeamBadge";
+import { SlotReel } from "../components/SlotReel";
 import type { GameController } from "../state/useGame";
 
+const SPIN_SETTLE_MS = 1100; // a hair past SlotReel's own animation duration
+
 export function Draft({ game }: { game: GameController }) {
-  const { mode, filled, usedEras, spin, respinTeamLeft, respinEraLeft, eraSwapAvailable, choose, respinTeam, respinEra } = game;
+  const {
+    mode,
+    filled,
+    usedEras,
+    spin,
+    teamSpinToken,
+    eraSpinToken,
+    respinTeamLeft,
+    respinEraLeft,
+    eraSwapAvailable,
+    choose,
+    respinTeam,
+    respinEra,
+  } = game;
+
+  // Hide the board while either reel is actively spinning, like the
+  // original prototype did — cards reappear once the reels settle.
+  const [boardReady, setBoardReady] = useState(true);
+  const firstRun = useRef(true);
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    setBoardReady(false);
+    const id = window.setTimeout(() => setBoardReady(true), SPIN_SETTLE_MS);
+    return () => window.clearTimeout(id);
+  }, [teamSpinToken, eraSpinToken]);
 
   if (!spin) return null;
 
@@ -18,6 +49,8 @@ export function Draft({ game }: { game: GameController }) {
     if (ao !== bo) return bo - ao;
     return b.ovr - a.ovr;
   });
+
+  const teamPool = teamsForEra(spin.era, filled);
 
   return (
     <section className="view">
@@ -38,12 +71,23 @@ export function Draft({ game }: { game: GameController }) {
         <div className="cell">
           <div className="eyebrow">Franchise</div>
           <div className="val">
-            <TeamBadge team={spin.team} /> {spin.team}
+            <SlotReel
+              spinToken={teamSpinToken}
+              value={spin.team}
+              pool={teamPool}
+              renderItem={(team) => (
+                <>
+                  <TeamBadge team={team} /> {team}
+                </>
+              )}
+            />
           </div>
         </div>
         <div className="cell">
           <div className="eyebrow">Era</div>
-          <div className="val">{spin.era}</div>
+          <div className="val">
+            <SlotReel spinToken={eraSpinToken} value={spin.era} pool={ERAS} renderItem={(era) => era} />
+          </div>
         </div>
         <div className="respin-note">
           Swaps left (whole draft) — franchise {respinTeamLeft} · era {respinEraLeft}. Era swap keeps your franchise
@@ -60,14 +104,17 @@ export function Draft({ game }: { game: GameController }) {
       </div>
 
       <p className="pick-hint">
-        {cards.length
-          ? "Every player from this franchise and era is on the board. Positions you’ve already filled are locked."
-          : "Nothing from this franchise and era — try a re-spin."}
+        {!boardReady
+          ? "Spinning…"
+          : cards.length
+            ? "Every player from this franchise and era is on the board. Positions you’ve already filled are locked."
+            : "Nothing from this franchise and era — try a re-spin."}
       </p>
       <div className="cards">
-        {cards.map((p) => (
-          <PlayerCard key={p.id} player={p} mode={mode} filled={filled} onDraft={(slotKey) => choose(p, slotKey)} />
-        ))}
+        {boardReady &&
+          cards.map((p) => (
+            <PlayerCard key={p.id} player={p} mode={mode} filled={filled} onDraft={(slotKey) => choose(p, slotKey)} />
+          ))}
       </div>
 
       <div className="roster">

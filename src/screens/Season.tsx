@@ -4,7 +4,7 @@ import { StandingsTable } from "../components/StandingsTable";
 import type { GameController } from "../state/useGame";
 
 export function Season({ game }: { game: GameController }) {
-  const { season, stepOnce, playToEnd, showBreakdown } = game;
+  const { season, autoplay, stepOnce, playToEnd, showBreakdown } = game;
   if (!season) return null;
   const s = season;
 
@@ -105,11 +105,11 @@ export function Season({ game }: { game: GameController }) {
 
       {s.phase !== "done" ? (
         <div className="season-controls">
-          <button className="btn" onClick={stepOnce}>
+          <button className="btn" onClick={stepOnce} disabled={autoplay}>
             Sim next game
           </button>
-          <button className="btn ghost" onClick={playToEnd}>
-            Play to end
+          <button className="btn ghost" onClick={playToEnd} disabled={autoplay}>
+            {autoplay ? "Playing…" : "Play to end"}
           </button>
         </div>
       ) : (

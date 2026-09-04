@@ -19,6 +19,9 @@ export type Mode = "classic" | "blind";
 
 const RESPIN_START = 3;
 const STORAGE_KEY = "seventeen-oh-best";
+// One game at a time, with a deliberate pause so each result is readable
+// before the next one plays.
+const AUTOPLAY_DELAY_MS = 1300;
 
 interface BestRecord {
   record?: string;
@@ -66,13 +69,17 @@ export function useGame() {
   const [filled, setFilled] = useState<FilledSlots>({});
   const [usedEras, setUsedEras] = useState<Era[]>([]);
   const [spin, setSpin] = useState<DraftSpin | null>(null);
+  // bumped only when that reel's value actually changes, so a franchise
+  // swap doesn't spin the era reel and vice versa
+  const [teamSpinToken, setTeamSpinToken] = useState(0);
+  const [eraSpinToken, setEraSpinToken] = useState(0);
   const [respinTeamLeft, setRespinTeamLeft] = useState(RESPIN_START);
   const [respinEraLeft, setRespinEraLeft] = useState(RESPIN_START);
 
   // season
   const [season, setSeason] = useState<SeasonState | null>(null);
+  const [autoplay, setAutoplay] = useState(false);
   const seasonCounted = useRef(false);
-  const autoplayTimer = useRef<number | null>(null);
 
   // results
   const [projection, setProjection] = useState<Projection | null>(null);
@@ -84,19 +91,29 @@ export function useGame() {
 
   const setMode = useCallback((m: Mode) => setModeState(m), []);
 
+  const applySpin = useCallback(
+    (next: DraftSpin, prev: DraftSpin | null) => {
+      setSpin(next);
+      if (!prev || prev.team !== next.team) setTeamSpinToken((t) => t + 1);
+      if (!prev || prev.era !== next.era) setEraSpinToken((t) => t + 1);
+    },
+    []
+  );
+
   const startDraft = useCallback(() => {
     const nextFilled: FilledSlots = {};
     setFilled(nextFilled);
     setUsedEras([]);
     setRespinTeamLeft(RESPIN_START);
     setRespinEraLeft(RESPIN_START);
-    setSpin(spinRound([], nextFilled));
+    applySpin(spinRound([], nextFilled), null);
     setSeason(null);
+    setAutoplay(false);
     setProjection(null);
     setSeasonSummary(null);
     seasonCounted.current = false;
     setScreen("draft");
-  }, []);
+  }, [applySpin]);
 
   const choose = useCallback(
     (player: Player, slotKey: string) => {
@@ -111,72 +128,62 @@ export function useGame() {
         setSeason(enterSeason(strength));
         setScreen("season");
       } else {
-        setSpin(spinRound(nextUsedEras, nextFilled));
+        applySpin(spinRound(nextUsedEras, nextFilled), spin);
       }
     },
-    [filled, usedEras, spin]
+    [filled, usedEras, spin, applySpin]
   );
 
   const respinTeam = useCallback(() => {
     if (!spin || respinTeamLeft <= 0) return;
     const newTeam = pickTeamSwap(spin.era, spin.team, filled);
     if (!newTeam) return;
-    setSpin({ era: spin.era, team: newTeam });
+    applySpin({ era: spin.era, team: newTeam }, spin);
     setRespinTeamLeft((n) => n - 1);
-  }, [spin, filled, respinTeamLeft]);
+  }, [spin, filled, respinTeamLeft, applySpin]);
 
   const respinEra = useCallback(() => {
     if (!spin || respinEraLeft <= 0) return;
     const next = pickEraSwap(usedEras, spin.era, spin.team, filled);
     if (!next) return;
-    setSpin(next);
+    applySpin(next, spin);
     setRespinEraLeft((n) => n - 1);
-  }, [spin, usedEras, filled, respinEraLeft]);
+  }, [spin, usedEras, filled, respinEraLeft, applySpin]);
 
   const eraSwapAvailable = spin ? canSwapEra(usedEras, spin.era) && respinEraLeft > 0 : false;
 
   const stepOnce = useCallback(() => {
-    setSeason((prev) => {
-      if (!prev || prev.phase === "done") return prev;
-      const next = stepSeason(prev);
-      if (next.phase === "done" && !seasonCounted.current) {
-        seasonCounted.current = true;
-        bumpPlays();
-        setBest(loadBest());
-      }
-      return next;
-    });
+    setSeason((prev) => (prev && prev.phase !== "done" ? stepSeason(prev) : prev));
   }, []);
 
-  const stopAutoplay = useCallback(() => {
-    if (autoplayTimer.current != null) {
-      window.clearTimeout(autoplayTimer.current);
-      autoplayTimer.current = null;
+  const playToEnd = useCallback(() => setAutoplay(true), []);
+
+  // Fires once, the instant a season reaches "done" — kept out of the
+  // setSeason updater above so it can't double-fire under React StrictMode,
+  // which invokes updater functions twice in development.
+  useEffect(() => {
+    if (season?.phase === "done" && !seasonCounted.current) {
+      seasonCounted.current = true;
+      bumpPlays();
+      setBest(loadBest());
     }
-  }, []);
+  }, [season?.phase]);
 
-  const playToEnd = useCallback(() => {
-    stopAutoplay();
-    const tick = () => {
-      setSeason((prev) => {
-        if (!prev || prev.phase === "done") return prev;
-        const next = stepSeason(prev);
-        if (next.phase === "done" && !seasonCounted.current) {
-          seasonCounted.current = true;
-          bumpPlays();
-          setBest(loadBest());
-        }
-        if (next.phase !== "done") {
-          const delay = prefersReducedMotion() ? 0 : 650;
-          autoplayTimer.current = window.setTimeout(tick, delay);
-        }
-        return next;
-      });
-    };
-    tick();
-  }, [stopAutoplay]);
-
-  useEffect(() => stopAutoplay, [stopAutoplay]);
+  // Auto-play: schedules exactly one more step, cleans its own timer up on
+  // every re-run (including React StrictMode's extra effect cycle), and
+  // stops itself once the season is done.
+  useEffect(() => {
+    if (!autoplay || !season) return;
+    if (season.phase === "done") {
+      setAutoplay(false);
+      return;
+    }
+    const delay = prefersReducedMotion() ? 0 : AUTOPLAY_DELAY_MS;
+    const id = window.setTimeout(() => {
+      setSeason((prev) => (prev && prev.phase !== "done" ? stepSeason(prev) : prev));
+    }, delay);
+    return () => window.clearTimeout(id);
+  }, [autoplay, season]);
 
   const showBreakdown = useCallback(() => {
     if (!season) return;
@@ -198,10 +205,10 @@ export function useGame() {
   }, [season]);
 
   const goHome = useCallback(() => {
-    stopAutoplay();
+    setAutoplay(false);
     setSeason(null);
     setScreen("title");
-  }, [stopAutoplay]);
+  }, []);
 
   const draftAgain = startDraft;
 
@@ -215,6 +222,8 @@ export function useGame() {
     filled,
     usedEras,
     spin,
+    teamSpinToken,
+    eraSpinToken,
     respinTeamLeft,
     respinEraLeft,
     eraSwapAvailable,
@@ -223,6 +232,7 @@ export function useGame() {
     respinEra,
     // season
     season,
+    autoplay,
     stepOnce,
     playToEnd,
     // results

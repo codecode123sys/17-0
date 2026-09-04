@@ -303,6 +303,28 @@
   }
   .reel .cell .val .badge { height: 19px; min-width: 30px; font-size: 11px; }
   .reel .cell .val.spinning { color: var(--accent); opacity: .8; }
+
+  .reel .cell .slot-window {
+    height: 38px;
+    overflow: hidden;
+    position: relative;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 78%, transparent 100%);
+  }
+  .reel .cell .slot-track {
+    display: flex;
+    flex-direction: column;
+  }
+  .reel .cell .slot-item {
+    height: 38px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    white-space: nowrap;
+  }
+  .reel .cell .slot-item .badge { height: 19px; min-width: 30px; font-size: 11px; }
   .respin-note {
     grid-column: 1 / -1;
     text-align: center;

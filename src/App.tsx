@@ -4,6 +4,7 @@ import { Title } from "./screens/Title";
 import { Draft } from "./screens/Draft";
 import { Season } from "./screens/Season";
 import { Results } from "./screens/Results";
+import { Analytics } from "@vercel/analytics/react";
 
 export default function App() {
   const game = useGame();
@@ -20,6 +21,7 @@ export default function App() {
       {game.screen === "draft" && <Draft game={game} />}
       {game.screen === "season" && <Season game={game} />}
       {game.screen === "results" && <Results game={game} />}
+      <Analytics />
     </div>
   );
 }

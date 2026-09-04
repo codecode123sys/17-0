@@ -86,3 +86,24 @@ probability constants are calibrated against (see the comments in
 `src/engine/season.ts` and `src/engine/projection.ts`) — if you change the
 curve's floor/ceiling here, re-tune those too, or a merely-solid roster
 will look like a guaranteed loser.
+
+**It only touches the hand-curated tier** (DEF at any era, and any
+1960s/1970s/1980s/1990s player) — it deliberately skips the
+2000s/2010s/2020s QB/RB/WR/TE tier that `build_offense_stats.py` already
+rates from real per-decade stats. An earlier version rescaled everyone,
+which meant a pipeline rating (already a percentile *within its own
+position and decade*) got re-ranked a second time against the entire
+all-time position pool. That second, unrelated transform crushed recent
+single-season rookies the pipeline had already placed sensibly — Malik
+Nabers' 2024 rookie year correctly landed him at 77 (mid-pack among 2020s
+WRs), and the second pass then buried him at 69 by comparing that 77
+against 25+ years of legends instead of his own era. Don't re-run a global
+rescale across the pipeline tier; if that tier ever looks miscalibrated,
+fix `build_offense_stats.py`'s curve instead.
+
+## Editing ratings by hand
+
+If you'd rather just fix ratings directly instead of tweaking the pipeline
+math, see the "Editing player ratings" section in the top-level README —
+`export_players_csv.py` / `import_players_csv.py` round-trip
+`src/data/players.ts` through a spreadsheet you can hand-edit.

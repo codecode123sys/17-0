@@ -31,6 +31,40 @@ every completed season across all visitors — see below.
 - `src/state/useGame.ts` — the screen/draft/season state machine
 - `src/screens/`, `src/components/` — the React UI
 
+## Editing player ratings
+
+Every player's rating lives in `src/data/players.ts`, but you don't have to
+hand-edit that file. There's a spreadsheet workflow instead:
+
+1. **Generate the spreadsheet CSV** (one time, or whenever the player pool
+   itself changes — new players added, etc.):
+   ```bash
+   python3 scripts/export_players_csv.py > players.csv
+   ```
+2. **Import it into Google Sheets**: create a blank Sheet, then
+   **File → Import → Upload**, pick `players.csv`, and choose "Replace
+   spreadsheet."
+3. **Edit ratings directly in the sheet.** Change the `ovr` column for any
+   player (55-99, keep it a whole number). You can also tweak the `line`
+   column (the stat blurb shown in-game). Leave `id`, `name`, `team`,
+   `era`, and `pos` alone — those identify the row, and this workflow can't
+   add or remove players, only correct their ratings.
+4. **Download your edited sheet as CSV**: **File → Download → Comma
+   Separated Values (.csv)**.
+5. **Pull the edits back into the game**:
+   ```bash
+   python3 scripts/import_players_csv.py ~/Downloads/players.csv
+   ```
+   This prints every rating it changed, then rewrites
+   `src/data/players.ts`.
+6. **Ship it**: `npm test && npm run build` to double check, then commit
+   and push — Vercel redeploys automatically.
+
+You can skip the download/re-upload step by publishing the sheet instead:
+**File → Share → Publish to web**, select your sheet and "Comma-separated
+values (.csv)," and pass that URL straight to
+`import_players_csv.py <url>` any time you've made edits.
+
 ## Season logging (optional)
 
 Every completed season — the 8 drafted players, final record, playoff

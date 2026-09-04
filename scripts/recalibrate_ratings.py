@@ -1,23 +1,38 @@
 """
-Rescales every player's OVR in src/data/players.ts to fix rating inflation:
-too many players (roughly the whole top quarter of any position) were
-landing at 88+, which flattened the difference between "very good" and
-"all-time great" and made most draft picks feel similarly elite.
+Rescales OVRs in src/data/players.ts to fix rating inflation in the
+hand-curated tier: too many hand-typed players (roughly the whole top
+quarter of any position) were landing at 88+, which flattened the
+difference between "very good" and "all-time great."
 
-This does NOT re-derive ratings from scratch (that's build_offense_stats.py
-for the real-stat-sourced 2000s+ offense tier). It takes each player's
-CURRENT ovr, ranks them within their position (QB/RB/WR/TE/DEF, pooled
-across every era — the game doesn't otherwise adjust for era strength, so
-an elite 1970s DEF and an elite 2020s DEF should occupy the same range),
+This ONLY touches hand-curated ratings: DEF at any era, and any position
+tagged 1960s/1970s/1980s/1990s — the players nobody ever ran through a
+principled, data-driven curve. It deliberately SKIPS the 2000s/2010s/2020s
+QB/RB/WR/TE tier that build_offense_stats.py already rates from real
+nflverse stats, ranked by percentile *within that position and decade*.
+An earlier version of this script re-ranked those pipeline ratings a
+second time against the entire all-time position pool — a second,
+unrelated percentile transform stacked on top of the first one. That
+compounding crushed recent, single-season rookies who the pipeline had
+already placed sensibly (e.g. Malik Nabers' 2024 rookie season correctly
+landed him at 77, mid-pack among 2020s WRs — the second global pass then
+buried him at 69 by comparing that 77 against 25+ years of legends instead
+of his own era). The pipeline tier's ratings are already well-spread
+(era-relative real stats, not hand judgment), so they don't need — and are
+actively hurt by — a second rescale.
+
+For the tier this script DOES touch, it takes each player's CURRENT ovr,
+ranks them within their position (QB/RB/WR/TE/DEF, pooled across every
+hand-curated era — the game doesn't otherwise adjust for era strength, so
+an elite 1970s DEF and an elite 1990s DEF should occupy the same range),
 and remaps that rank through a curve designed to reserve 90+ for genuine
 standouts:
 
-  - bottom 85% of a position  -> 58..82   (a wide "good, established" band)
-  - top 15% of a position     -> 82..99   (only real standouts get here)
+  - bottom 85% of the hand-curated pool at a position -> 58..82
+  - top 15% of the hand-curated pool at a position     -> 82..99
 
 Relative order within a position is preserved; only the spacing changes.
 Career stat lines are untouched. Run after build_offense_stats.py if
-you're doing both, since this rescales whatever ovr values already exist.
+you're doing both — this rescales whatever ovr values already exist.
 
 Usage:
     python3 scripts/recalibrate_ratings.py [--dry-run]
@@ -39,6 +54,15 @@ ROW = re.compile(
 
 TOP_SHARE = 0.15
 LOW_FLOOR, MID, CEIL = 58, 82, 99
+
+# Real-stat-sourced tier (build_offense_stats.py) — already era-relative
+# percentiles from actual nflverse data, so it's excluded from this rescale.
+PIPELINE_ERAS = {"2000s", "2010s", "2020s"}
+PIPELINE_POS = {"QB", "RB", "WR", "TE"}
+
+
+def is_hand_curated(pos: str, era: str) -> bool:
+    return not (pos in PIPELINE_POS and era in PIPELINE_ERAS)
 
 
 def curve(pct: float) -> float:
@@ -62,9 +86,10 @@ def main() -> None:
 
     by_pos: dict[str, list[int]] = {}
     for i, r in enumerate(rows):
-        by_pos.setdefault(r["pos"], []).append(i)
+        if is_hand_curated(r["pos"], r["era"]):
+            by_pos.setdefault(r["pos"], []).append(i)
 
-    new_ovr = [0] * len(rows)
+    new_ovr = [r["ovr"] for r in rows]
     for pos, idxs in by_pos.items():
         idxs_sorted = sorted(idxs, key=lambda i: rows[i]["ovr"])
         n = len(idxs_sorted)

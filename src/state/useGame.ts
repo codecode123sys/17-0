@@ -21,7 +21,7 @@ const RESPIN_START = 3;
 const STORAGE_KEY = "seventeen-oh-best";
 // One game at a time, with a deliberate pause so each result is readable
 // before the next one plays.
-const AUTOPLAY_DELAY_MS = 1300;
+const AUTOPLAY_DELAY_MS = 900;
 
 interface BestRecord {
   record?: string;
@@ -91,14 +91,21 @@ export function useGame() {
 
   const setMode = useCallback((m: Mode) => setModeState(m), []);
 
-  const applySpin = useCallback(
-    (next: DraftSpin, prev: DraftSpin | null) => {
-      setSpin(next);
-      if (!prev || prev.team !== next.team) setTeamSpinToken((t) => t + 1);
-      if (!prev || prev.era !== next.era) setEraSpinToken((t) => t + 1);
-    },
-    []
-  );
+  // A brand-new round is a fresh pull of the lever — both reels always spin,
+  // even if the random result happens to repeat the previous round's team
+  // or era. Only a targeted swap (the respin buttons) should animate just
+  // the reel whose value actually changed.
+  const applyFreshSpin = useCallback((next: DraftSpin) => {
+    setSpin(next);
+    setTeamSpinToken((t) => t + 1);
+    setEraSpinToken((t) => t + 1);
+  }, []);
+
+  const applyTargetedSpin = useCallback((next: DraftSpin, prev: DraftSpin) => {
+    setSpin(next);
+    if (prev.team !== next.team) setTeamSpinToken((t) => t + 1);
+    if (prev.era !== next.era) setEraSpinToken((t) => t + 1);
+  }, []);
 
   const startDraft = useCallback(() => {
     const nextFilled: FilledSlots = {};
@@ -106,14 +113,14 @@ export function useGame() {
     setUsedEras([]);
     setRespinTeamLeft(RESPIN_START);
     setRespinEraLeft(RESPIN_START);
-    applySpin(spinRound([], nextFilled), null);
+    applyFreshSpin(spinRound([], nextFilled));
     setSeason(null);
     setAutoplay(false);
     setProjection(null);
     setSeasonSummary(null);
     seasonCounted.current = false;
     setScreen("draft");
-  }, [applySpin]);
+  }, [applyFreshSpin]);
 
   const choose = useCallback(
     (player: Player, slotKey: string) => {
@@ -128,27 +135,27 @@ export function useGame() {
         setSeason(enterSeason(strength));
         setScreen("season");
       } else {
-        applySpin(spinRound(nextUsedEras, nextFilled), spin);
+        applyFreshSpin(spinRound(nextUsedEras, nextFilled));
       }
     },
-    [filled, usedEras, spin, applySpin]
+    [filled, usedEras, spin, applyFreshSpin]
   );
 
   const respinTeam = useCallback(() => {
     if (!spin || respinTeamLeft <= 0) return;
     const newTeam = pickTeamSwap(spin.era, spin.team, filled);
     if (!newTeam) return;
-    applySpin({ era: spin.era, team: newTeam }, spin);
+    applyTargetedSpin({ era: spin.era, team: newTeam }, spin);
     setRespinTeamLeft((n) => n - 1);
-  }, [spin, filled, respinTeamLeft, applySpin]);
+  }, [spin, filled, respinTeamLeft, applyTargetedSpin]);
 
   const respinEra = useCallback(() => {
     if (!spin || respinEraLeft <= 0) return;
     const next = pickEraSwap(usedEras, spin.era, spin.team, filled);
     if (!next) return;
-    applySpin(next, spin);
+    applyTargetedSpin(next, spin);
     setRespinEraLeft((n) => n - 1);
-  }, [spin, usedEras, filled, respinEraLeft, applySpin]);
+  }, [spin, usedEras, filled, respinEraLeft, applyTargetedSpin]);
 
   const eraSwapAvailable = spin ? canSwapEra(usedEras, spin.era) && respinEraLeft > 0 : false;
 

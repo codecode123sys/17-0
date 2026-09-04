@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ERAS, SLOTS, openSlots, roundPlayers, targetsFor, teamsForEra } from "../engine/draft";
+import { ERAS, SLOTS, openSlots, roundPlayers, targetsFor, teamsPresentInEra } from "../engine/draft";
 import { PlayerCard } from "../components/PlayerCard";
 import { TeamBadge } from "../components/TeamBadge";
 import { SlotReel } from "../components/SlotReel";
@@ -50,7 +50,11 @@ export function Draft({ game }: { game: GameController }) {
     return b.ovr - a.ovr;
   });
 
-  const teamPool = teamsForEra(spin.era, filled);
+  // Deliberately the broad "every team in this era" pool, not the narrower
+  // draftable-only set — this is only for decoy variety while the reel
+  // spins, so it stays lively even late in the draft when few franchises
+  // are actually eligible for the open slot.
+  const teamPool = teamsPresentInEra(spin.era);
 
   return (
     <section className="view">

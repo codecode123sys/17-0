@@ -78,6 +78,17 @@ export function teamsForEra(era: Era, filled: FilledSlots): string[] {
   return mid.length ? mid : base;
 }
 
+/** Every franchise with any player in this era, ignoring draftability —
+ *  used only to fill a slot reel with visual variety while it spins. When
+ *  only a handful of franchises are actually eligible late in a draft, the
+ *  narrower `teamsForEra` set makes a spinning reel look frozen (every
+ *  decoy is the same team); this keeps the animation lively regardless. */
+export function teamsPresentInEra(era: Era): string[] {
+  const seen = new Set<string>();
+  for (const p of PLAYERS) if (p.era === era) seen.add(p.team);
+  return [...seen];
+}
+
 export function teamDraftableInEra(team: string, era: Era, filled: FilledSlots): boolean {
   return PLAYERS.some((p) => p.team === team && p.era === era && targetsFor(p, filled).length > 0);
 }

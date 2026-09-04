@@ -1,32 +1,37 @@
-# React + TypeScript + Vite
+# 17–0
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Draft an 8-man all-time NFL roster — a decade of history at a time via a
+franchise + era spinner — then simulate a full season: a real 17-game
+schedule inside a randomly-assigned division, real standings and seeding,
+and a full playoff bracket, all against a simulated season for the other
+31 teams.
 
-Currently, two official plugins are available:
+`reference/17-0.html` is the original single-file prototype this project
+was ported from — kept as the source of truth for game data and rules.
+Don't hand-edit it; change the ported modules under `src/` instead.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+Vite + React + TypeScript, plain CSS (design tokens ported from the
+prototype, light/dark via `prefers-color-scheme`), Vitest for the
+simulation engine. No backend — best-record persistence is `localStorage`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Layout
 
-## Expanding the Oxlint configuration
+- `src/data/` — the player pool and team/division data (typed, generated
+  from `reference/17-0.html`)
+- `src/engine/` — pure, DOM-free simulation logic: the draft slot machine
+  (`draft.ts`), the season/league/playoff sim (`season.ts`), the
+  Monte Carlo preseason projection (`projection.ts`), and generated
+  team-badge/portrait data (`visuals.ts`). Has its own Vitest suite.
+- `src/state/useGame.ts` — the screen/draft/season state machine
+- `src/screens/`, `src/components/` — the React UI
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## Commands
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev      # start the dev server
+npm test         # run the engine test suite
+npm run build    # type-check + production build
 ```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.

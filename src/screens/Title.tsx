@@ -46,11 +46,6 @@ export function Title({ game }: { game: GameController }) {
           <strong>{best.perfects ?? 0}</strong>
         </p>
       )}
-
-      <p className="footnote">
-        A prototype in the spirit of <em>82&ndash;0</em>. Player pool is hand-curated and career stat lines are
-        approximate &mdash; this is about the feel of the loop, not a record book.
-      </p>
     </section>
   );
 }

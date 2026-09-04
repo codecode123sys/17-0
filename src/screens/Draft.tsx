@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ERAS, SLOTS, openSlots, roundPlayers, targetsFor, teamsPresentInEra } from "../engine/draft";
 import { PlayerCard } from "../components/PlayerCard";
 import { TeamBadge } from "../components/TeamBadge";
 import { SlotReel } from "../components/SlotReel";
 import type { GameController } from "../state/useGame";
 
-const SPIN_SETTLE_MS = 1100; // a hair past SlotReel's own animation duration
+const SPIN_SETTLE_MS = 1000; // a hair past SlotReel's 950ms CSS animation
 
 export function Draft({ game }: { game: GameController }) {
   const {
@@ -23,15 +23,10 @@ export function Draft({ game }: { game: GameController }) {
     respinEra,
   } = game;
 
-  // Hide the board while either reel is actively spinning, like the
-  // original prototype did — cards reappear once the reels settle.
-  const [boardReady, setBoardReady] = useState(true);
-  const firstRun = useRef(true);
+  // Hide the board while either reel is actively spinning — including the
+  // very first spin when the draft starts — reappearing once they settle.
+  const [boardReady, setBoardReady] = useState(false);
   useEffect(() => {
-    if (firstRun.current) {
-      firstRun.current = false;
-      return;
-    }
     setBoardReady(false);
     const id = window.setTimeout(() => setBoardReady(true), SPIN_SETTLE_MS);
     return () => window.clearTimeout(id);

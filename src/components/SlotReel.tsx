@@ -1,12 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
+import type { CSSProperties } from "react";
 
-const ITEM_H = 38; // px — must match .slot-item / .slot-window height in game.css
 const STOPS = 16; // decoys shown while spinning, before landing on the real value
-const DURATION_MS = 1050;
 
 /** A vertical slot-machine reel. Bump `spinToken` to trigger a new spin —
- *  the strip fills with random decoys drawn from `pool` and scrolls down to
- *  land on `value`. When `spinToken` doesn't change it just sits still. */
+ *  the strip fills with random decoys drawn from `pool` and animates down
+ *  to land on `value`, including the very first time it renders.
+ *
+ *  Implemented as a CSS keyframe animation on a freshly-keyed element
+ *  (rather than manually sequencing a transition in JS): giving the track
+ *  a `key={spinToken}` forces React to mount a brand-new element on every
+ *  spin, and a fresh element always plays its `animation` from the start —
+ *  no refs, no requestAnimationFrame timing, nothing for React StrictMode's
+ *  extra effect cycle or Fast Refresh to leave in a half-updated state. */
 export function SlotReel<T>({
   spinToken,
   value,
@@ -18,54 +24,21 @@ export function SlotReel<T>({
   pool: T[];
   renderItem: (v: T) => React.ReactNode;
 }) {
-  const [strip, setStrip] = useState<T[]>([value]);
-  const [offsetIndex, setOffsetIndex] = useState(0);
-  const [transitioning, setTransitioning] = useState(false);
-  const prevToken = useRef(spinToken);
-  const firstRun = useRef(true);
-  const rafIds = useRef<number[]>([]);
-
-  useEffect(() => {
-    if (firstRun.current) {
-      firstRun.current = false;
-      prevToken.current = spinToken;
-      return;
-    }
-    if (prevToken.current === spinToken) return;
-    prevToken.current = spinToken;
-
+  const strip = useMemo(() => {
     const decoys = Array.from({ length: STOPS - 1 }, () =>
       pool.length ? pool[Math.floor(Math.random() * pool.length)] : value
     );
-    const newStrip = [...decoys, value];
-
-    setTransitioning(false);
-    setStrip(newStrip);
-    setOffsetIndex(0);
-
-    rafIds.current.forEach(cancelAnimationFrame);
-    const id1 = requestAnimationFrame(() => {
-      const id2 = requestAnimationFrame(() => {
-        setTransitioning(true);
-        setOffsetIndex(newStrip.length - 1);
-      });
-      rafIds.current = [id2];
-    });
-    rafIds.current = [id1];
-
-    return () => rafIds.current.forEach(cancelAnimationFrame);
+    return [...decoys, value];
+    // Intentionally keyed only on spinToken: this freezes the decoy strip
+    // for the duration of one spin instead of reshuffling on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spinToken]);
 
+  const style = { "--stops": strip.length - 1 } as CSSProperties;
+
   return (
     <div className="slot-window">
-      <div
-        className="slot-track"
-        style={{
-          transform: `translateY(-${offsetIndex * ITEM_H}px)`,
-          transition: transitioning ? `transform ${DURATION_MS}ms cubic-bezier(.13,.7,.18,1)` : "none",
-        }}
-      >
+      <div key={spinToken} className="slot-track" style={style}>
         {strip.map((v, i) => (
           <div className="slot-item" key={i}>
             {renderItem(v)}

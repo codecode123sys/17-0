@@ -314,6 +314,17 @@
   .reel .cell .slot-track {
     display: flex;
     flex-direction: column;
+    animation: slot-spin 950ms cubic-bezier(.13, .7, .18, 1) both;
+  }
+  @keyframes slot-spin {
+    from { transform: translateY(0); }
+    to { transform: translateY(calc(var(--stops, 15) * -38px)); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reel .cell .slot-track {
+      animation: none;
+      transform: translateY(calc(var(--stops, 15) * -38px));
+    }
   }
   .reel .cell .slot-item {
     height: 38px;
@@ -824,14 +835,14 @@
   .strow.me { color: var(--accent-strong); }
   .strow.me .sp, .strow.me .sw { color: var(--accent-strong); font-weight: 600; }
   .season-controls {
-    margin-top: 18px;
+    margin: 4px 0 20px;
     display: flex;
     gap: 10px;
     justify-content: center;
     flex-wrap: wrap;
   }
   .season-final {
-    margin-top: 22px;
+    margin: 4px 0 22px;
     text-align: center;
     background: var(--panel);
     border: 1px solid var(--panel-line);

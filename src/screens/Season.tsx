@@ -40,6 +40,26 @@ export function Season({ game }: { game: GameController }) {
         &mdash; simulated one at a time. Dots show opponent difficulty.
       </p>
 
+      {s.phase !== "done" ? (
+        <div className="season-controls">
+          <button className="btn" onClick={stepOnce} disabled={autoplay}>
+            Sim game
+          </button>
+          <button className="btn ghost" onClick={playToEnd} disabled={autoplay}>
+            {autoplay ? "Simming…" : "Sim season"}
+          </button>
+        </div>
+      ) : (
+        <div className="season-final">
+          <div className="verdict">{s.result === 5 ? "Champions" : "Final"}</div>
+          <div className={"final-rec" + (perfect || s.result === 5 ? " perfect" : "")}>{summary!.record}</div>
+          <div className="final-line">{summary!.outcomeText}</div>
+          <button className="btn" onClick={showBreakdown}>
+            Full breakdown &rarr;
+          </button>
+        </div>
+      )}
+
       <div className="sked">
         {s.sched.map((w, i) =>
           w.bye ? (
@@ -100,26 +120,6 @@ export function Season({ game }: { game: GameController }) {
       {s.phase !== "regular" && (
         <div id="standings">
           <StandingsTable season={s} />
-        </div>
-      )}
-
-      {s.phase !== "done" ? (
-        <div className="season-controls">
-          <button className="btn" onClick={stepOnce} disabled={autoplay}>
-            Sim next game
-          </button>
-          <button className="btn ghost" onClick={playToEnd} disabled={autoplay}>
-            {autoplay ? "Playing…" : "Play to end"}
-          </button>
-        </div>
-      ) : (
-        <div className="season-final">
-          <div className="verdict">{s.result === 5 ? "Champions" : "Final"}</div>
-          <div className={"final-rec" + (perfect || s.result === 5 ? " perfect" : "")}>{summary!.record}</div>
-          <div className="final-line">{summary!.outcomeText}</div>
-          <button className="btn" onClick={showBreakdown}>
-            Full breakdown &rarr;
-          </button>
         </div>
       )}
     </section>

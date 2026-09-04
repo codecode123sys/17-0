@@ -14,7 +14,9 @@ Don't hand-edit it; change the ported modules under `src/` instead.
 
 Vite + React + TypeScript, plain CSS (design tokens ported from the
 prototype, light/dark via `prefers-color-scheme`), Vitest for the
-simulation engine. No backend — best-record persistence is `localStorage`.
+simulation engine. Per-visitor best-record persistence is `localStorage`
+(never leaves the browser). There's an optional, separate master log of
+every completed season across all visitors — see below.
 
 ## Layout
 
@@ -28,6 +30,66 @@ simulation engine. No backend — best-record persistence is `localStorage`.
   team-badge/portrait data (`visuals.ts`). Has its own Vitest suite.
 - `src/state/useGame.ts` — the screen/draft/season state machine
 - `src/screens/`, `src/components/` — the React UI
+
+## Season logging (optional)
+
+Every completed season — the 8 drafted players, final record, playoff
+outcome, roster strength, and a timestamp — can be logged as one row to a
+Google Sheet, across every visitor, as a running dataset. Nothing personal
+is sent; it's pure gameplay data. This is entirely optional: with no
+webhook configured, `src/lib/logSeason.ts` no-ops silently.
+
+Setup:
+
+1. Create a blank Google Sheet. **Extensions → Apps Script**, paste in the
+   script below, and run `setupHeaders` once from the editor (approve the
+   permission prompt — it's your own script touching your own sheet).
+2. **Deploy → New deployment → Web app.** Execute as "Me," access "Anyone."
+   Copy the resulting URL (ends in `/exec`).
+3. Copy `.env.example` to `.env.local`, and set `VITE_SHEET_WEBHOOK_URL` to
+   that URL and `VITE_SHEET_WEBHOOK_KEY` to a random string of your choice
+   (it just has to match the `SHARED_KEY` constant in the script below —
+   this isn't real auth, just enough to stop randos from spamming the
+   endpoint if they ever found the URL). Set the same two values in
+   Vercel's **Project Settings → Environment Variables** for production,
+   then redeploy.
+
+```javascript
+var SHARED_KEY = "REPLACE_WITH_YOUR_OWN_RANDOM_STRING";
+
+var SLOTS = ["qb", "rb1", "rb2", "wr1", "wr2", "te", "flex", "def"];
+
+function setupHeaders() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var headers = ["timestamp", "strength", "wins", "losses", "seed", "divWinner", "division", "result", "outcome"];
+  SLOTS.forEach(function (s) {
+    headers.push(s + "_name", s + "_team", s + "_era", s + "_ovr");
+  });
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.setFrozenRows(1);
+}
+
+function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  if (data.key !== SHARED_KEY) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: "bad key" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var row = [new Date(), data.strength, data.wins, data.losses, data.seed, data.divWinner, data.division, data.result, data.outcome];
+  SLOTS.forEach(function (s) {
+    var p = (data.players && data.players[s]) || {};
+    row.push(p.name || "", p.team || "", p.era || "", p.ovr || "");
+  });
+  sheet.appendRow(row);
+
+  return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
+}
+```
+
+Download the collected data as a real `.xlsx` anytime from the sheet:
+**File → Download → Microsoft Excel (.xlsx)**.
 
 ## Commands
 

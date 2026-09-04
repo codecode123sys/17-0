@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
 
 # Python data-pipeline environment (scripts/README.md explains how to
 # recreate it — nothing in here should ever be committed)

@@ -13,6 +13,7 @@ import { simulate } from "../engine/projection";
 import type { Projection } from "../engine/projection";
 import { enterSeason, stepSeason, summarizeSeason } from "../engine/season";
 import type { SeasonState, SeasonSummary } from "../engine/season";
+import { logSeasonResult } from "../lib/logSeason";
 
 export type Screen = "title" | "draft" | "season" | "results";
 export type Mode = "classic" | "blind";
@@ -169,11 +170,13 @@ export function useGame() {
   // setSeason updater above so it can't double-fire under React StrictMode,
   // which invokes updater functions twice in development.
   useEffect(() => {
-    if (season?.phase === "done" && !seasonCounted.current) {
+    if (season && season.phase === "done" && !seasonCounted.current) {
       seasonCounted.current = true;
       bumpPlays();
       setBest(loadBest());
+      logSeasonResult(season, filled);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [season?.phase]);
 
   // Auto-play: schedules exactly one more step, cleans its own timer up on

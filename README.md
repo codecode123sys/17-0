@@ -18,8 +18,10 @@ simulation engine. No backend — best-record persistence is `localStorage`.
 
 ## Layout
 
-- `src/data/` — the player pool and team/division data (typed, generated
-  from `reference/17-0.html`)
+- `src/data/` — the player pool and team/division data. QB/RB/WR/TE from
+  2000 onward are rated from real nflverse stats by `scripts/`; everything
+  else (DEF at any era, anyone pre-2000) is hand-curated — see
+  `scripts/README.md` for why that split exists and how to re-run it.
 - `src/engine/` — pure, DOM-free simulation logic: the draft slot machine
   (`draft.ts`), the season/league/playoff sim (`season.ts`), the
   Monte Carlo preseason projection (`projection.ts`), and generated

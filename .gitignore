@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Python data-pipeline environment (scripts/README.md explains how to
+# recreate it — nothing in here should ever be committed)
+scripts/.venv
+__pycache__/
+*.pyc
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

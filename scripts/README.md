@@ -61,3 +61,28 @@ python3 -m venv .venv
 Re-run it whenever a season finishes (bump `LATEST_SEASON` in the script)
 or the hand-curated pool changes which 2000s+ offensive players it
 includes.
+
+## `recalibrate_ratings.py` — fixing rating inflation
+
+A separate, no-dependency script that rescales **every** player's `ovr`
+(hand-curated and pipeline-sourced alike) to fix rating inflation: the
+original curve let roughly the top quarter of any position group land at
+88+, which flattened the gap between "very good" and "all-time great."
+
+It ranks every player within their position (pooled across all eras — the
+game doesn't otherwise adjust for era strength) and remaps that rank
+through a curve that reserves 90+ for genuine standouts: the bottom 85% of
+a position lands in a 58-82 band, and only the top 15% reach 82-99.
+Relative order is preserved; only the spacing changes. Run it any time
+after the pool or `build_offense_stats.py` changes ratings:
+
+```bash
+python3 scripts/recalibrate_ratings.py --dry-run   # preview
+python3 scripts/recalibrate_ratings.py              # write src/data/players.ts
+```
+
+This changes the *shape* of the rating scale, which the game's win-
+probability constants are calibrated against (see the comments in
+`src/engine/season.ts` and `src/engine/projection.ts`) — if you change the
+curve's floor/ceiling here, re-tune those too, or a merely-solid roster
+will look like a guaranteed loser.

@@ -1,10 +1,17 @@
 import { gauss } from "./season";
 
+// Opponent means and the /13 divisor below are calibrated against the
+// player pool's rating scale in src/data/players.ts (see
+// scripts/recalibrate_ratings.py) — a near-perfect roster (~98) should have
+// roughly a 1-in-10 shot at 17-0, while a solid-but-unoptimized draft
+// (~80) should still be a competitive, winning team rather than a
+// guaranteed loser. Re-tune both together if the rating scale ever changes.
+
 /** Win probability against a randomly-drawn opponent of the given mean/spread. */
 export function gameWin(S: number, oppMean: number, oppSd: number, homeBonus: number): boolean {
   let opp = oppMean + gauss() * oppSd;
   opp = Math.max(40, Math.min(105, opp));
-  const p = 1 / (1 + Math.exp(-(S + homeBonus - opp) / 7));
+  const p = 1 / (1 + Math.exp(-(S + homeBonus - opp) / 13));
   return Math.random() < p;
 }
 
@@ -32,11 +39,11 @@ export function playoffRun(S: number, wins: number): number {
   } else return 0;
 
   if (seed !== 1) {
-    if (!gameWin(S, 87, 7, seed <= 4 ? 2 : 0)) return 1; // Wild Card
+    if (!gameWin(S, 79, 7, seed <= 4 ? 2 : 0)) return 1; // Wild Card
   }
-  if (!gameWin(S, 90, 6, seed <= 2 ? 2 : 0)) return 2; // Divisional
-  if (!gameWin(S, 93, 5, seed <= 2 ? 2 : 0)) return 3; // Conference Championship
-  if (!gameWin(S, 95, 5, 0)) return 4; // Super Bowl (neutral site)
+  if (!gameWin(S, 82, 6, seed <= 2 ? 2 : 0)) return 2; // Divisional
+  if (!gameWin(S, 85, 5, seed <= 2 ? 2 : 0)) return 3; // Conference Championship
+  if (!gameWin(S, 87, 5, 0)) return 4; // Super Bowl (neutral site)
   return 5;
 }
 
@@ -68,7 +75,7 @@ export function simulate(S: number, seasons = 10000): Projection {
   for (let i = 0; i < seasons; i++) {
     let w = 0;
     for (let g = 0; g < 17; g++) {
-      if (gameWin(S, 84, 7, 0)) w++;
+      if (gameWin(S, 76, 7, 0)) w++;
     }
     winDist[w]++;
     totalWins += w;

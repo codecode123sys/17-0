@@ -46,7 +46,13 @@ export interface League {
 }
 
 /** Builds the other 31 real NFL teams and drops your roster into one random
- *  division slot. */
+ *  division slot.
+ *
+ *  The 74 baseline (and the /13 divisor in playGame/playGameBool below) are
+ *  calibrated against the player rating scale in src/data/players.ts (see
+ *  scripts/recalibrate_ratings.py) — re-tune both together if that scale
+ *  ever changes, or a solid-but-unoptimized roster will look like a
+ *  guaranteed loser (or a near-perfect one will look too easy). */
 export function buildLeague(playerStrength: number): League {
   const div = DIVISIONS[(Math.random() * DIVISIONS.length) | 0];
   const conf = div.slice(0, 3);
@@ -54,7 +60,7 @@ export function buildLeague(playerStrength: number): League {
     name,
     div: TEAM_DIV[name],
     conf: TEAM_DIV[name].slice(0, 3),
-    str: clampStr(82 + gauss() * 6),
+    str: clampStr(74 + gauss() * 6),
     wins: 0,
     losses: 0,
     seed: 0,
@@ -121,7 +127,7 @@ export function buildSchedule(league: Team[], div: string): ScheduleWeek[] {
 // ---------- games ----------
 
 export function playGameBool(sA: number, sB: number, aHome: boolean): boolean {
-  return Math.random() < 1 / (1 + Math.exp(-(sA + (aHome ? 2 : 0) - sB) / 7));
+  return Math.random() < 1 / (1 + Math.exp(-(sA + (aHome ? 2 : 0) - sB) / 13));
 }
 
 export interface GameResult {
@@ -133,7 +139,7 @@ export interface GameResult {
 /** A single simulated, scored game — used for every game the player actually plays. */
 export function playGame(S: number, ostr: number, home: boolean | null): GameResult {
   const eff = S + (home === true ? 2 : 0);
-  const win = Math.random() < 1 / (1 + Math.exp(-(eff - ostr) / 7));
+  const win = Math.random() < 1 / (1 + Math.exp(-(eff - ostr) / 13));
   const loser = Math.round(Math.max(3, Math.min(45, 20 + gauss() * 6)));
   let margin = Math.round(Math.abs(gauss() * 8) + 1 + Math.abs(eff - ostr) * 0.22);
   margin = Math.max(1, Math.min(44, margin));
@@ -316,7 +322,7 @@ function computePlayoffs(s: SeasonState): SeasonState {
     if (t.isPlayer) return { ...t, wins: s.wins, losses: s.losses };
     let w = 0;
     for (let g = 0; g < 17; g++) {
-      if (playGameBool(t.str, clampStr(82 + gauss() * 6), Math.random() < 0.5)) w++;
+      if (playGameBool(t.str, clampStr(74 + gauss() * 6), Math.random() < 0.5)) w++;
     }
     return { ...t, wins: w, losses: 17 - w };
   });

@@ -1,38 +1,33 @@
 """
-Rescales OVRs in src/data/players.ts to fix rating inflation in the
-hand-curated tier: too many hand-typed players (roughly the whole top
-quarter of any position) were landing at 88+, which flattened the
-difference between "very good" and "all-time great."
+Rescales the hand-curated tier's OVRs in src/data/players.ts: DEF at any
+era, and any position tagged 1960s/1970s/1980s/1990s — the players nobody
+ever ran through a principled, data-driven curve. It deliberately SKIPS
+the 2000s/2010s/2020s QB/RB/WR/TE tier that build_offense_stats.py already
+rates from real nflverse stats.
 
-This ONLY touches hand-curated ratings: DEF at any era, and any position
-tagged 1960s/1970s/1980s/1990s — the players nobody ever ran through a
-principled, data-driven curve. It deliberately SKIPS the 2000s/2010s/2020s
-QB/RB/WR/TE tier that build_offense_stats.py already rates from real
-nflverse stats, ranked by percentile *within that position and decade*.
-An earlier version of this script re-ranked those pipeline ratings a
-second time against the entire all-time position pool — a second,
-unrelated percentile transform stacked on top of the first one. That
-compounding crushed recent, single-season rookies who the pipeline had
-already placed sensibly (e.g. Malik Nabers' 2024 rookie season correctly
-landed him at 77, mid-pack among 2020s WRs — the second global pass then
-buried him at 69 by comparing that 77 against 25+ years of legends instead
-of his own era). The pipeline tier's ratings are already well-spread
-(era-relative real stats, not hand judgment), so they don't need — and are
-actively hurt by — a second rescale.
+Rates each hand-curated player by z-score — standard deviations above the
+mean OVR of their own position's hand-curated peer group (QB/RB/WR/TE
+pooled across 1960s-1990s; DEF pooled across every era, since the game
+doesn't otherwise adjust for era strength) — then maps that z-score onto a
+55-99 scale via RATING_CENTER/RATING_SPREAD/RATING_FLOOR (kept identical
+to build_offense_stats.py's constants, so a "76" means the same thing
+whether a player's rating came from real stats or hand judgment).
 
-For the tier this script DOES touch, it takes each player's CURRENT ovr,
-ranks them within their position (QB/RB/WR/TE/DEF, pooled across every
-hand-curated era — the game doesn't otherwise adjust for era strength, so
-an elite 1970s DEF and an elite 1990s DEF should occupy the same range),
-and remaps that rank through a curve designed to reserve 90+ for genuine
-standouts:
+Why z-score and not percentile rank: percentile rank guarantees the single
+best-rated player in a group hits the ceiling, no matter how thin the
+group is or how close the runner-up is — with 5 hand-curated groups
+(QB/RB/WR/TE/DEF) that's 5 automatic 99s regardless of whether any of them
+are truly separated from their peers. A z-score only reaches the ceiling
+when a player is a genuine statistical outlier — e.g. Jerry Rice or Jim
+Brown, not just "whoever happened to be hand-typed highest in a group of
+40."
 
-  - bottom 85% of the hand-curated pool at a position -> 58..82
-  - top 15% of the hand-curated pool at a position     -> 82..99
-
-Relative order within a position is preserved; only the spacing changes.
-Career stat lines are untouched. Run after build_offense_stats.py if
-you're doing both — this rescales whatever ovr values already exist.
+The baseline OVR fed into the z-score always comes from the ORIGINAL,
+never-rescaled values in reference/17-0.html (the project's source of
+truth for player data), not from whatever's currently in players.ts. That
+makes this script idempotent — re-running it always produces the same
+result from the same original judgment calls, instead of compounding a
+rescale on top of a previous rescale's rounding.
 
 Usage:
     python3 scripts/recalibrate_ratings.py [--dry-run]
@@ -42,33 +37,31 @@ from __future__ import annotations
 
 import argparse
 import re
+import statistics as st
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PLAYERS_TS = REPO_ROOT / "src" / "data" / "players.ts"
+REFERENCE_HTML = REPO_ROOT / "reference" / "17-0.html"
 
-ROW = re.compile(
+TS_ROW = re.compile(
     r"\['((?:[^'\\]|\\.)*)', '((?:[^'\\]|\\.)*)', '(\d{4}s)', '(QB|RB|WR|TE|DEF)', (\d+), '((?:[^'\\]|\\.)*)'\]"
 )
+HTML_ROW = re.compile(
+    r'\["((?:[^"\\]|\\.)*)",\s*"((?:[^"\\]|\\.)*)",\s*"(\d{4}s)",\s*"(QB|RB|WR|TE|DEF)",\s*(\d+),\s*"((?:[^"\\]|\\.)*)"\]'
+)
 
-TOP_SHARE = 0.15
-LOW_FLOOR, MID, CEIL = 58, 82, 99
+HAND_ERAS = {"1960s", "1970s", "1980s", "1990s"}
 
-# Real-stat-sourced tier (build_offense_stats.py) — already era-relative
-# percentiles from actual nflverse data, so it's excluded from this rescale.
-PIPELINE_ERAS = {"2000s", "2010s", "2020s"}
-PIPELINE_POS = {"QB", "RB", "WR", "TE"}
+# Kept identical to build_offense_stats.py's RATING_CENTER/SPREAD/FLOOR.
+RATING_CENTER = 76
+RATING_SPREAD = 9
+RATING_FLOOR = 55
 
 
 def is_hand_curated(pos: str, era: str) -> bool:
-    return not (pos in PIPELINE_POS and era in PIPELINE_ERAS)
-
-
-def curve(pct: float) -> float:
-    if pct <= 1 - TOP_SHARE:
-        return LOW_FLOOR + (pct / (1 - TOP_SHARE)) * (MID - LOW_FLOOR)
-    return MID + ((pct - (1 - TOP_SHARE)) / TOP_SHARE) * (CEIL - MID)
+    return pos == "DEF" or era in HAND_ERAS
 
 
 def main() -> None:
@@ -76,12 +69,25 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    text = PLAYERS_TS.read_text(encoding="utf-8")
-    matches = list(ROW.finditer(text))
-    rows = [
-        {"name": m.group(1), "team": m.group(2), "era": m.group(3), "pos": m.group(4), "ovr": int(m.group(5)), "line": m.group(6)}
-        for m in matches
-    ]
+    ts_text = PLAYERS_TS.read_text(encoding="utf-8")
+    ts_matches = list(TS_ROW.finditer(ts_text))
+
+    html_text = REFERENCE_HTML.read_text(encoding="utf-8")
+    original_ovr = [int(m.group(5)) for m in HTML_ROW.finditer(html_text)]
+
+    if len(original_ovr) != len(ts_matches):
+        print(
+            f"error: reference/17-0.html has {len(original_ovr)} players but "
+            f"players.ts has {len(ts_matches)} — they should always match 1:1 "
+            "by row order. Aborting rather than guessing.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    rows = []
+    for m, orig_ovr in zip(ts_matches, original_ovr):
+        name, team, era, pos, ovr, line = m.groups()
+        rows.append({"name": name, "team": team, "era": era, "pos": pos, "ovr": int(ovr), "orig_ovr": orig_ovr, "line": line})
     print(f"parsed {len(rows)} players", file=sys.stderr)
 
     by_pos: dict[str, list[int]] = {}
@@ -91,36 +97,32 @@ def main() -> None:
 
     new_ovr = [r["ovr"] for r in rows]
     for pos, idxs in by_pos.items():
-        idxs_sorted = sorted(idxs, key=lambda i: rows[i]["ovr"])
-        n = len(idxs_sorted)
-        for rank, i in enumerate(idxs_sorted):
-            pct = rank / (n - 1) if n > 1 else 1.0
-            new_ovr[i] = round(curve(pct))
+        vals = [rows[i]["orig_ovr"] for i in idxs]
+        mean = st.mean(vals)
+        std = st.pstdev(vals) or 1e-6
+        for i in idxs:
+            z = (rows[i]["orig_ovr"] - mean) / std
+            new_ovr[i] = round(max(RATING_FLOOR, min(99, RATING_CENTER + z * RATING_SPREAD)))
 
     changed = 0
-    out = []
-    for row, m, nv in zip(rows, matches, new_ovr):
-        old = row["ovr"]
-        if nv != old:
+    for i, (row, nv) in enumerate(zip(rows, new_ovr)):
+        if nv != row["ovr"]:
             changed += 1
-        out.append((m, row, nv))
 
     print(f"{changed} of {len(rows)} ratings changed", file=sys.stderr)
     if args.dry_run:
-        for m, row, nv in out:
+        for row, nv in zip(rows, new_ovr):
             if nv != row["ovr"]:
                 print(f"  {row['name']:24} {row['pos']:3} {row['era']}  {row['ovr']:3} -> {nv:3}")
         return
 
-    # Rebuild the file by replacing each matched row in place (preserves
-    # everything else in players.ts — comments, formatting, exports).
     pieces = []
     last_end = 0
-    for m, row, nv in out:
-        pieces.append(text[last_end:m.start()])
+    for m, row, nv in zip(ts_matches, rows, new_ovr):
+        pieces.append(ts_text[last_end : m.start()])
         pieces.append(f"['{row['name']}', '{row['team']}', '{row['era']}', '{row['pos']}', {nv}, '{row['line']}']")
         last_end = m.end()
-    pieces.append(text[last_end:])
+    pieces.append(ts_text[last_end:])
     PLAYERS_TS.write_text("".join(pieces), encoding="utf-8")
     print(f"wrote {PLAYERS_TS.relative_to(REPO_ROOT)}", file=sys.stderr)
 

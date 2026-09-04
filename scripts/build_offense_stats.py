@@ -116,17 +116,36 @@ def load_real_stats() -> pd.DataFrame:
     return real
 
 
+# Shared with the hand-curated tier's constants in recalibrate_ratings.py —
+# see that file's module docstring for why the whole 55-99 scale is defined
+# this way (standard deviations above one's own position/era peer group,
+# not percentile rank).
+RATING_CENTER = 76
+RATING_SPREAD = 9
+RATING_FLOOR = 55
+
+
 def rate(real: pd.DataFrame) -> pd.DataFrame:
     """Map each (position, era) group's peak EPA/game to a 55-99 rating by
-    percentile against every qualifying real player at that position that
+    z-score against every qualifying real player at that position that
     decade — not just the players already in our pool — so it's a true
     'how good relative to everyone who played this position this decade'
-    score."""
+    score.
+
+    This used to rank by percentile instead (60 + pct*39), which guarantees
+    the single best player in every bucket maxes out at 99 no matter how
+    thin the bucket is or how close the gap to 2nd place — with 4 positions
+    x 3 decades, that's 12 automatic 99s before the hand-curated tier even
+    adds its own. A z-score only reaches the ceiling when a player is a
+    genuine statistical outlier from their peer group, not just whoever
+    happens to rank #1 in a narrow bucket."""
     out = []
     for (pos, era), grp in real.groupby(["position", "era"]):
-        pct = grp["peak_epa_per_game"].rank(pct=True)
         grp = grp.copy()
-        grp["ovr"] = (60 + pct * 39).round().clip(55, 99).astype(int)
+        mean = grp["peak_epa_per_game"].mean()
+        std = grp["peak_epa_per_game"].std(ddof=0) or 1e-6
+        z = (grp["peak_epa_per_game"] - mean) / std
+        grp["ovr"] = (RATING_CENTER + z * RATING_SPREAD).round().clip(RATING_FLOOR, 99).astype(int)
         out.append(grp)
     return pd.concat(out, ignore_index=True)
 

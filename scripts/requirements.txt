@@ -2,7 +2,6 @@ appdirs==1.4.4
 cramjam==2.11.0
 fastparquet==2024.11.0
 fsspec==2025.10.0
-nfl_data_py==0.3.3
 numpy==1.26.4
 packaging==26.3
 pandas==1.5.3

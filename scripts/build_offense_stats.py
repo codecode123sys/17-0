@@ -52,14 +52,21 @@ import re
 import sys
 from pathlib import Path
 
-import nfl_data_py as nfl
 import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PLAYERS_TS = REPO_ROOT / "src" / "data" / "players.ts"
 REFERENCE_HTML = REPO_ROOT / "reference" / "17-0.html"
 
-LATEST_SEASON = 2024  # last season published as a finished nflverse release
+# nflverse's stats_player release — one regular-season parquet per year,
+# actively maintained. This replaces nfl_data_py's import_seasonal_data(),
+# which reads from the "player_stats" dataset nflverse deprecated on
+# 2025-08-01 in favor of this one; the old dataset stopped receiving new
+# seasons at that point, which is why this pipeline was stuck at 2024 for
+# a while. See https://github.com/nflverse/nflverse-data/releases/tag/stats_player
+STATS_PLAYER_REG_URL = "https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_reg_{year}.parquet"
+
+LATEST_SEASON = 2025  # last season published as a finished nflverse release
 
 DECADES = {
     "2000s": range(2000, 2010),
@@ -92,15 +99,16 @@ STAT_LABEL = {"QB": "passing yards", "RB": "rushing yards", "WR": "receiving yar
 def load_season_data() -> pd.DataFrame:
     """Every qualifying (>= MIN_GAMES_PER_SEASON) regular-season row,
     2000-LATEST_SEASON, with EPA computed — the shared raw material for
-    both the peak-rate rating and the league-rank accolade."""
-    print("Fetching player bios…", file=sys.stderr)
-    players = nfl.import_players()[["gsis_id", "display_name", "position"]]
+    both the peak-rate rating and the league-rank accolade.
 
-    print(f"Fetching 2000-{LATEST_SEASON} seasonal stats (nflverse)…", file=sys.stderr)
-    seasonal = nfl.import_seasonal_data(list(range(2000, LATEST_SEASON + 1)))
-    seasonal = seasonal[seasonal["season_type"] == "REG"]
-
-    df = seasonal.merge(players, left_on="player_id", right_on="gsis_id", how="left")
+    One parquet fetch per season (each file already includes display name
+    and position, so no separate bio lookup/merge is needed)."""
+    frames = []
+    for year in range(2000, LATEST_SEASON + 1):
+        print(f"Fetching {year} regular-season stats (nflverse)…", file=sys.stderr)
+        frames.append(pd.read_parquet(STATS_PLAYER_REG_URL.format(year=year)))
+    df = pd.concat(frames, ignore_index=True)
+    df = df.rename(columns={"player_display_name": "display_name", "passing_interceptions": "interceptions"})
     df = df[df["position"].isin(POS_MAP)].copy()
     df["epa_total"] = df[["passing_epa", "rushing_epa", "receiving_epa"]].fillna(0).sum(axis=1)
     df["epa_per_game"] = df["epa_total"] / df["games"].replace(0, pd.NA)

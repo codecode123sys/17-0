@@ -2,12 +2,20 @@
 
 `build_offense_stats.py` refreshes `stats`/`accolades` for every
 **QB/RB/WR/TE player tagged 2000s, 2010s, or 2020s** in
-`src/data/players.ts` from real per-decade stats via
-[nflverse](https://github.com/nflverse) (the `nfl_data_py` package), then
-regenerates that file. `ovr` for this tier is hand-curated (see "Why
-`ovr` for 2000s+ is hand-curated" below) and is left alone by default —
-only `stats` (real cumulative counting numbers) and `accolades` (a real,
-verifiable highlight — see below) refresh automatically.
+`src/data/players.ts` from real per-decade stats pulled directly from
+[nflverse](https://github.com/nflverse)'s `stats_player` release (one
+parquet file per season), then regenerates that file. `ovr` for this tier
+is hand-curated (see "Why `ovr` for 2000s+ is hand-curated" below) and is
+left alone by default — only `stats` (real cumulative counting numbers)
+and `accolades` (a real, verifiable highlight — see below) refresh
+automatically.
+
+This used to go through the `nfl_data_py` package's `import_seasonal_data()`,
+which reads from nflverse's older `player_stats` dataset — deprecated
+2025-08-01 in favor of `stats_player`, and frozen at the 2024 season since
+(no new seasons were ever added to the deprecated dataset). Fetching the
+new dataset's parquet files directly means one less dependency and, more
+importantly, actually gets each new season as nflverse publishes it.
 
 ## Why only offense, and only 2000+
 

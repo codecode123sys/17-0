@@ -114,6 +114,7 @@ def load_decade_aggregates(season_df: pd.DataFrame) -> pd.DataFrame:
     for era, years in DECADES.items():
         chunk = season_df[season_df["season"].isin(years)].copy()
         chunk["era"] = era
+        chunk["prod_per_game"] = chunk.apply(lambda r: r[PRIMARY_STAT[r["position"]]] / r["games"], axis=1)
 
         # Cumulative decade totals — used for the human-readable stats line.
         totals = chunk.groupby(["display_name", "position"], as_index=False).agg(
@@ -146,6 +147,27 @@ def load_decade_aggregates(season_df: pd.DataFrame) -> pd.DataFrame:
             .rename(columns={"epa_per_game": "peak_epa_per_game"})
         )
 
+        # Peak production rate — the same best-N-seasons treatment, but on
+        # raw counting-stat volume (yards/game in the position's headline
+        # stat) rather than EPA efficiency. EPA alone systematically
+        # undervalues high-volume, lower-efficiency players relative to how
+        # real fans perceive them — rushing plays are worth less per-play
+        # than passing plays league-wide, so even a genuinely good, heavy-
+        # usage runner (a rushing-title winner, say) can post negative EPA/
+        # game every season, while a receiver stuck with poor QB play gets
+        # dinged for incompletions that weren't his fault. Blending in a
+        # real production signal (see `rate()`) keeps a true efficiency
+        # outlier at the top without burying a legitimately productive,
+        # merely-average-efficiency player at the bottom of their era.
+        peak_prod = (
+            chunk.sort_values("prod_per_game", ascending=False)
+            .groupby(["display_name", "position"])
+            .head(PEAK_SEASONS)
+            .groupby(["display_name", "position"], as_index=False)["prod_per_game"]
+            .mean()
+            .rename(columns={"prod_per_game": "peak_prod_per_game"})
+        )
+
         # Best (lowest-numbered) single-season league rank within the decade.
         ranks = compute_season_ranks(chunk)
         best_rank = (
@@ -154,6 +176,7 @@ def load_decade_aggregates(season_df: pd.DataFrame) -> pd.DataFrame:
         best_rank = best_rank.rename(columns={"season_rank": "best_rank", "season": "best_rank_season"})
 
         agg = totals.merge(peak, on=["display_name", "position"], how="inner")
+        agg = agg.merge(peak_prod, on=["display_name", "position"], how="left")
         agg = agg.merge(best_rank, on=["display_name", "position"], how="left")
         agg["era"] = era
         rows.append(agg)
@@ -172,14 +195,35 @@ RATING_SPREAD = 9
 RATING_FLOOR = 55
 
 
+# Weight on the efficiency (EPA) signal in the blended rating below; the
+# remainder (1 - EFFICIENCY_WEIGHT) goes to raw production volume. 0.5 was
+# chosen so neither signal dominates: a player who's both efficient and
+# productive (the truly elite) still tops the chart, but a merely-average-
+# efficiency player with real volume (a rushing-title winner, a featured
+# receiver on a bad offense) isn't buried by EPA alone.
+EFFICIENCY_WEIGHT = 0.5
+
+
 def rate(real: pd.DataFrame) -> pd.DataFrame:
-    """Map each (position, era) group's peak EPA/game to a 55-99 rating by
-    z-score against every qualifying real player at that position that
+    """Map each (position, era) group's peak performance to a 55-99 rating
+    by z-score against every qualifying real player at that position that
     decade — not just the players already in our pool — so it's a true
     'how good relative to everyone who played this position this decade'
     score.
 
-    This used to rank by percentile instead (60 + pct*39), which guarantees
+    The rating blends two z-scores: peak EPA/game (efficiency — how much
+    value they created per play) and peak production/game (volume — real
+    counting-stat output in their position's headline stat). EPA alone
+    systematically undervalues high-volume, merely-average-efficiency
+    players: rushing plays are worth less per-play than passing plays
+    league-wide, so even a genuine rushing-title winner can post negative
+    EPA/game most seasons, and a receiver stuck with bad QB play gets
+    dinged for incompletions that weren't his fault. Blending in a real
+    production signal fixes that without losing the far more important
+    upside of tracking real stats at all — a true efficiency outlier who's
+    also productive (the actually-elite tier) still tops the chart.
+
+    This used to rank by percentile instead of z-score, which guarantees
     the single best player in every bucket maxes out at 99 no matter how
     thin the bucket is or how close the gap to 2nd place is. With 4
     positions x 3 decades, that's 12 automatic 99s before the hand-curated
@@ -189,9 +233,13 @@ def rate(real: pd.DataFrame) -> pd.DataFrame:
     out = []
     for (pos, era), grp in real.groupby(["position", "era"]):
         grp = grp.copy()
-        mean = grp["peak_epa_per_game"].mean()
-        std = grp["peak_epa_per_game"].std(ddof=0) or 1e-6
-        z = (grp["peak_epa_per_game"] - mean) / std
+        eff_mean = grp["peak_epa_per_game"].mean()
+        eff_std = grp["peak_epa_per_game"].std(ddof=0) or 1e-6
+        prod_mean = grp["peak_prod_per_game"].mean()
+        prod_std = grp["peak_prod_per_game"].std(ddof=0) or 1e-6
+        z_eff = (grp["peak_epa_per_game"] - eff_mean) / eff_std
+        z_prod = (grp["peak_prod_per_game"] - prod_mean) / prod_std
+        z = EFFICIENCY_WEIGHT * z_eff + (1 - EFFICIENCY_WEIGHT) * z_prod
         grp["ovr"] = (RATING_CENTER + z * RATING_SPREAD).round().clip(RATING_FLOOR, 99).astype(int)
         out.append(grp)
     return pd.concat(out, ignore_index=True)

@@ -34,28 +34,42 @@ For each matched player, in each decade:
 
 1. Pull every regular-season game from nflverse for that decade.
 2. Compute total offensive EPA (`passing_epa + rushing_epa + receiving_epa`)
-   per game, per season.
-3. Take the average of their **best 3 qualifying seasons** in that decade
-   (`PEAK_SEASONS` in the script) — not a decade-long average across every
-   season. Averaging the whole span punishes players for a slow start or an
-   injury year even if they were excellent otherwise; an early version of
-   this script rated Saquon Barkley's 2020s at 63 despite a 2,005-yard,
-   Super Bowl-winning 2024 season for exactly that reason.
-4. Compare that peak rate to the other players already in the pool **at
+   per game, per season — the **efficiency** signal.
+3. Also compute raw production per game in the position's headline
+   counting stat (passing/rushing/receiving yards) — the **volume**
+   signal.
+4. For each signal separately, take the average of the player's **best 3
+   qualifying seasons** in that decade (`PEAK_SEASONS` in the script) —
+   not a decade-long average across every season. Averaging the whole
+   span punishes players for a slow start or an injury year even if they
+   were excellent otherwise; an early version of this script rated Saquon
+   Barkley's 2020s at 63 despite a 2,005-yard, Super Bowl-winning 2024
+   season for exactly that reason.
+5. Compare each peak rate to the other players already in the pool **at
    that position and decade only** (not the entire NFL) — the pool was
    already pre-filtered to notable players, so comparing against literally
    everyone compresses almost all of them toward the ceiling and the
    ratings stop discriminating between tiers.
-5. Convert that comparison to a rating via **z-score**, not percentile
-   rank: `RATING_CENTER + (standard deviations above the bucket's mean) *
-   RATING_SPREAD`, clipped to 55-99. Percentile rank was tried first and
-   discarded — it guarantees the single best player in *every* bucket hits
-   the 99 ceiling, no matter how thin the bucket is or how close the
-   runner-up is. With 4 positions × 3 decades, that's 12 automatic 99s
-   before the hand-curated tier even adds its own five. A z-score only
-   reaches the ceiling when a player is a genuine statistical outlier from
-   their own peer group — e.g. Priest Holmes' absurd 2002-03 stretch,
-   not just whoever happens to rank #1 in a narrow bucket.
+6. Convert each comparison to a z-score, then blend them:
+   `EFFICIENCY_WEIGHT * z_efficiency + (1 - EFFICIENCY_WEIGHT) * z_production`
+   (`EFFICIENCY_WEIGHT = 0.5` in the script — neither signal dominates).
+   EPA alone systematically undervalues real, high-volume production:
+   rushing plays are worth less per-play than passing plays league-wide,
+   so even a genuine rushing-title winner (Josh Jacobs' 2022, say) can
+   post negative EPA/game most seasons, and a receiver stuck with bad QB
+   play gets dinged for incompletions that weren't his fault. Blending in
+   raw production fixes that without losing the efficiency signal
+   entirely — a player who's both efficient *and* productive (the truly
+   elite tier) still tops the chart.
+7. Map the blended z-score to a rating: `RATING_CENTER + z *
+   RATING_SPREAD`, clipped to 55-99. This is a z-score, not a percentile
+   rank, on purpose — percentile rank guarantees the single best player in
+   *every* bucket hits the 99 ceiling, no matter how thin the bucket is or
+   how close the runner-up is. With 4 positions × 3 decades, that's 12
+   automatic 99s before the hand-curated tier even adds its own five. A
+   z-score only reaches the ceiling when a player is a genuine statistical
+   outlier from their own peer group — e.g. Priest Holmes' absurd 2002-03
+   stretch, not just whoever happens to rank #1 in a narrow bucket.
 
 The `stats` line (e.g. `4,906 rush yds · 31 TD`) is a straight cumulative
 decade total, separate from the rating itself.

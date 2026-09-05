@@ -45,12 +45,12 @@ hand-edit that file. There's a spreadsheet workflow instead:
    **File → Import → Upload**, pick `players.csv`, and choose "Replace
    spreadsheet."
 3. **Edit ratings directly in the sheet.** Change the `ovr` column for any
-   player (55-99, keep it a whole number) — this drives roster balance
-   internally but is never shown in the game. You can also tweak `stats`
-   (the counting-stat line) or `accolades` (the highlight underneath it);
-   both are what players actually see in-game. Leave `id`, `name`, `team`,
-   `era`, and `pos` alone — those identify the row, and this workflow can't
-   add or remove players, only correct their ratings and text.
+   player (55-99, keep it a whole number) — this drives roster balance and
+   is shown in-game as "OVR." You can also tweak `stats` (the counting-stat
+   line) or `accolades` (the highlight underneath it). Leave `id`, `name`,
+   `team`, `era`, and `pos` alone — those identify the row, and this
+   workflow can't add or remove players, only correct their ratings and
+   text.
 4. **Download your edited sheet as CSV**: **File → Download → Comma
    Separated Values (.csv)**.
 5. **Pull the edits back into the game**:

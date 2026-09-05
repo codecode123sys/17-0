@@ -1,7 +1,7 @@
 """
-Rates every 2000s/2010s/2020s offensive player (QB/RB/WR/TE) in the existing
-player pool using real per-decade stats from nflverse (nfl_data_py) instead
-of hand judgment, and regenerates src/data/players.ts.
+Refreshes `stats`/`accolades` for every 2000s/2010s/2020s offensive player
+(QB/RB/WR/TE) in the existing player pool from real per-decade stats via
+nflverse (nfl_data_py), and regenerates src/data/players.ts.
 
 Why offense-only, 2000+: nflverse's structured, play-by-play-derived player
 stats (nfl_data_py.import_seasonal_data / import_weekly_data) only go back
@@ -23,13 +23,24 @@ led the league (or ranked top 3 / top 10) in their position's headline
 counting stat. If they never cracked the top 10 in any single season,
 `accolades` is left blank rather than inventing something.
 
+`ovr` for this tier is now hand-curated, same as the DEF/pre-2000 tier —
+after several rounds of tuning the automated formula (percentile vs
+z-score, era-pooled vs era-scoped, efficiency vs volume-blended) still
+produced ratings that didn't match real-world judgment for enough
+players, the pool's actual overalls were hand-set directly based on
+real-world era-relative quality. This script leaves that untouched by
+default and only refreshes `stats`/`accolades` — the objective, factual
+half of each row — from fresh data (e.g. after a new season finishes).
+Pass --overwrite-ovr to go back to the fully automated rating if you ever
+want to; see rate() below for how it works.
+
 This ALWAYS reads its starting player list from reference/17-0.html (the
 project's source of truth for which players are in the pool), not from
 src/data/players.ts, so it can regenerate the pipeline tier from scratch
 regardless of that file's current schema or state.
 
 Usage:
-    scripts/.venv/bin/python scripts/build_offense_stats.py [--dry-run]
+    scripts/.venv/bin/python scripts/build_offense_stats.py [--dry-run] [--overwrite-ovr]
 
 --dry-run prints what would change without touching src/data/players.ts.
 """
@@ -273,6 +284,10 @@ def accolade_line(row: pd.Series) -> str:
 HTML_ROW = re.compile(
     r'\["((?:[^"\\]|\\.)*)",\s*"((?:[^"\\]|\\.)*)",\s*"(\d{4}s)",\s*"(QB|RB|WR|TE|DEF)",\s*(\d+),\s*"((?:[^"\\]|\\.)*)"\]'
 )
+TS_ROW = re.compile(
+    r"\['((?:[^'\\]|\\.)*)', '((?:[^'\\]|\\.)*)', '(\d{4}s)', '(QB|RB|WR|TE|DEF)', (\d+), "
+    r"'((?:[^'\\]|\\.)*)', '((?:[^'\\]|\\.)*)'\]"
+)
 
 
 def load_reference_rows() -> list[dict]:
@@ -329,12 +344,32 @@ def write_players_ts(rows: list[dict]) -> None:
     PLAYERS_TS.write_text("\n".join(lines), encoding="utf-8")
 
 
+def load_current_ovr() -> dict[tuple[str, str, str, str], int]:
+    """The ovr currently in players.ts, keyed by (name, team, era, pos).
+    Used so this script never overwrites a hand-curated 2000s+ rating with
+    a freshly computed one — see the note in main() below."""
+    if not PLAYERS_TS.exists():
+        return {}
+    text = PLAYERS_TS.read_text(encoding="utf-8")
+    out = {}
+    for m in TS_ROW.finditer(text):
+        name, team, era, pos, ovr, _stats, _accolades = m.groups()
+        out[(name, team, era, pos)] = int(ovr)
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument(
+        "--overwrite-ovr",
+        action="store_true",
+        help="also overwrite hand-curated 2000s+ ovr with the freshly computed rating (normally left alone)",
+    )
     args = ap.parse_args()
 
     existing = load_reference_rows()
+    current_ovr = load_current_ovr()
     season_df = load_season_data()
     real = load_decade_aggregates(season_df)
 
@@ -367,7 +402,13 @@ def main() -> None:
             key = (normalize_name(entry["name"]), entry["pos"], entry["era"])
             match = real_by_key.get(key)
             if match is not None:
-                row["ovr"] = int(match["ovr"])
+                # ovr for this tier is hand-curated (see the note above
+                # main()) — keep whatever's currently in players.ts unless
+                # --overwrite-ovr is passed. stats/accolades always refresh
+                # from live data, since those are just facts, not judgment.
+                ts_key = (esc(entry["name"]), esc(entry["team"]), entry["era"], entry["pos"])
+                current = current_ovr.get(ts_key)
+                row["ovr"] = int(match["ovr"]) if (args.overwrite_ovr or current is None) else current
                 row["stats"] = stats_line(match)
                 row["accolades"] = accolade_line(match)
                 updated += 1

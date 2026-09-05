@@ -1,12 +1,13 @@
 # Data pipeline
 
-`build_offense_stats.py` rates every **QB/RB/WR/TE player tagged 2000s,
-2010s, or 2020s** in `src/data/players.ts` using real per-decade stats from
-[nflverse](https://github.com/nflverse) (via the `nfl_data_py` package)
-instead of hand judgment, then regenerates that file. Every player gets an
-`ovr` (used only internally, for roster balance — never shown in the
-game), a `stats` line (real cumulative counting numbers), and an
-`accolades` line (a real, verifiable highlight — see below).
+`build_offense_stats.py` refreshes `stats`/`accolades` for every
+**QB/RB/WR/TE player tagged 2000s, 2010s, or 2020s** in
+`src/data/players.ts` from real per-decade stats via
+[nflverse](https://github.com/nflverse) (the `nfl_data_py` package), then
+regenerates that file. `ovr` for this tier is hand-curated (see "Why
+`ovr` for 2000s+ is hand-curated" below) and is left alone by default —
+only `stats` (real cumulative counting numbers) and `accolades` (a real,
+verifiable highlight — see below) refresh automatically.
 
 ## Why only offense, and only 2000+
 
@@ -18,19 +19,45 @@ freely-licensed source of season-by-season individual defensive stats
 So this pipeline updates what it can legitimately source and leaves the
 rest exactly as it was:
 
-- **Updated**: QB/RB/WR/TE, era `2000s`/`2010s`/`2020s` — 186 of those 192
-  had their rating change on the last run; the rest matched but computed
-  to the same value.
-- **Left hand-curated, on purpose**: every `DEF` player at any era, and
-  every player of any position tagged `1960s`/`1970s`/`1980s`/`1990s`.
-- **Left as-is because no match was found**: printed at the end of a run
-  (e.g. Michael Vick's `2000s` entry — his federal suspension years likely
-  put his games-played for that decade under the pipeline's qualifying
-  threshold).
+- **`stats`/`accolades` updated**: QB/RB/WR/TE, era
+  `2000s`/`2010s`/`2020s`.
+- **`ovr` left hand-curated, on purpose**: every `DEF` player at any era,
+  every player of any position tagged `1960s`/`1970s`/`1980s`/`1990s`,
+  *and* (since the change below) the 2000s/2010s/2020s QB/RB/WR/TE tier
+  too — the whole player pool's `ovr` is hand-curated now.
+- **Left as-is entirely because no match was found**: printed at the end
+  of a run (e.g. Michael Vick's `2000s` entry — his federal suspension
+  years likely put his games-played for that decade under the pipeline's
+  qualifying threshold).
 
-## How the rating works
+## Why `ovr` for 2000s+ is hand-curated
 
-For each matched player, in each decade:
+This tier's `ovr` used to be fully automated from real nflverse stats.
+That went through several rounds of genuine methodology fixes — percentile
+rank vs. z-score, comparing within era vs. pooling across eras, pure
+efficiency (EPA) vs. blending in real production volume — each fixing a
+real, identifiable problem (see the git history and the section below for
+what each one solved). But it kept producing ratings that didn't match
+real-world judgment closely enough for enough players, especially at
+running back and receiver. At some point that's not a bug to keep
+patching, it's a sign that a from-stats formula alone won't reliably match
+how people actually perceive a player's quality — reputation, playoff
+moments, how "dominant" a season felt, and plain name recognition matter
+in ways a formula built from box-score stats can't fully capture. So
+`ovr` for this tier is now hand-set directly, the same way it always has
+been for `DEF` and pre-2000 players — see "Editing ratings by hand" below.
+
+`build_offense_stats.py` still refreshes `stats` and `accolades`
+automatically, since those are just facts (real cumulative totals, real
+league-leader ranks) rather than a judgment call, and stay useful to keep
+current after each new season.
+
+## How the automated rating worked (opt-in via `--overwrite-ovr`)
+
+The formula below is no longer the default — see above — but it's still
+in the script (behind `--overwrite-ovr`) as a real, principled starting
+point if the pool ever needs bulk re-rating again. For each matched
+player, in each decade:
 
 1. Pull every regular-season game from nflverse for that decade.
 2. Compute total offensive EPA (`passing_epa + rushing_epa + receiving_epa`)
@@ -97,8 +124,9 @@ python3 -m venv .venv
 ```
 
 Re-run it whenever a season finishes (bump `LATEST_SEASON` in the script)
-or the hand-curated pool changes which 2000s+ offensive players it
-includes.
+to refresh `stats`/`accolades` — it won't touch anyone's `ovr` unless you
+also pass `--overwrite-ovr`, which goes back to the fully automated
+rating described below for the whole 2000s+ tier at once.
 
 ## `recalibrate_ratings.py` — rating the hand-curated tier
 
@@ -130,15 +158,15 @@ python3 scripts/recalibrate_ratings.py --dry-run   # preview
 python3 scripts/recalibrate_ratings.py              # write src/data/players.ts
 ```
 
-It deliberately skips the 2000s/2010s/2020s QB/RB/WR/TE tier —
-`build_offense_stats.py` already rates that tier from real stats within
-its own position and decade, so running a *second*, unrelated transform
-on top (an earlier version of this script rescaled everyone) double-
-counts and distorts it. That bug is what buried Malik Nabers' 2024 rookie
+It deliberately skips the 2000s/2010s/2020s QB/RB/WR/TE tier — that tier's
+`ovr` is hand-curated directly now too (see "Why `ovr` for 2000s+ is
+hand-curated" above), so there's nothing here for this script to touch.
+An earlier version of this script rescaled everyone, back when the
+pipeline tier's `ovr` was still fully automated — running a *second*,
+unrelated transform on top of an already-computed rating double-counted
+and distorted it. That bug is what buried Malik Nabers' 2024 rookie
 season (already a reasonable 77 from real stats) down to 69, by comparing
-that 77 against 25+ years of unrelated legends a second time. If the
-pipeline tier ever looks miscalibrated, fix `build_offense_stats.py`
-instead of rescaling its output here.
+that 77 against 25+ years of unrelated legends a second time.
 
 This changes the *shape* of the rating scale, which the game's win-
 probability constants are calibrated against (see the comments in
@@ -174,7 +202,9 @@ Like the ovr rescale above, this always re-derives from
 
 ## Editing ratings by hand
 
-If you'd rather just fix ratings directly instead of tweaking the pipeline
-math, see the "Editing player ratings" section in the top-level README —
-`export_players_csv.py` / `import_players_csv.py` round-trip
-`src/data/players.ts` through a spreadsheet you can hand-edit.
+This is now the primary way to fix a rating anywhere in the pool,
+including the 2000s+ tier — see the "Editing player ratings" section in
+the top-level README. `export_players_csv.py` / `import_players_csv.py`
+round-trip `src/data/players.ts` through a spreadsheet you can hand-edit;
+edits to `ovr` there are permanent and won't be touched by a future
+`build_offense_stats.py` run unless you pass `--overwrite-ovr`.

@@ -94,11 +94,16 @@ A separate, no-dependency script that rates the **hand-curated tier only**
 `build_offense_stats.py`: each player's ORIGINAL hand-typed `ovr` from
 `reference/17-0.html` (never the current, possibly-already-rescaled value
 in `players.ts`) is converted to standard deviations above the mean of
-their position's hand-curated peer group (QB/RB/WR/TE pooled across
-1960s-1990s; DEF pooled across every era, since the game doesn't otherwise
-adjust for era strength), then mapped through the identical
-`RATING_CENTER`/`RATING_SPREAD`/`RATING_FLOOR` constants so a "76" means
-the same thing whether it came from real stats or hand judgment.
+their own **position and era** (e.g. 1970s QBs are only compared against
+other 1970s QBs, never pooled with 1960s/1980s/1990s QBs), then mapped
+through the identical `RATING_CENTER`/`RATING_SPREAD`/`RATING_FLOOR`
+constants so a "76" means the same thing whether it came from real stats
+or hand judgment. This matches how the pipeline tier already rates
+players — within their own position and decade — rather than assuming the
+league's overall talent level was flat across 60+ years of hand-curated
+eras. The tradeoff: era buckets are much smaller than pooling every era
+together would be (TE, for instance, is only 5-6 hand-curated players per
+decade), so a z-score here is noisier than a position-pooled one.
 
 Because it always starts from the pristine original values in
 `reference/17-0.html`, it's idempotent — re-running it never compounds a

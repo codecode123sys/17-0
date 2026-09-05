@@ -101,6 +101,7 @@ export function Results({ game }: { game: GameController }) {
               <div className="nm">{p.name}</div>
               <div className="mt">
                 <TeamBadge team={p.team} /> {p.era}
+                {mode === "classic" && ` · OVR ${p.ovr}`}
               </div>
               {mode === "classic" && p.stats && <div className="mt">{p.stats}</div>}
               {mode === "classic" && p.accolades && <div className="mt accolades">{p.accolades}</div>}

@@ -475,10 +475,18 @@
     font-family: "IBM Plex Mono", monospace;
     font-style: italic;
   }
-  .card.elite {
-    border-color: var(--accent-strong);
-    box-shadow: 0 0 0 1px var(--accent-strong);
+  .card .ovr {
+    align-self: flex-start;
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 600;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 2px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    margin-top: 4px;
   }
+  .card .ovr.tier1 { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-strong); }
   .card .targets {
     display: flex;
     gap: 6px;

@@ -31,8 +31,8 @@ export function Title({ game }: { game: GameController }) {
         </div>
         <p className="mode-note">
           {mode === "classic"
-            ? "Classic shows each player’s career line while you pick."
-            : "Blind hides career stats — draft on memory and gut alone."}
+            ? "Classic shows each player’s rating and career line while you pick."
+            : "Blind hides ratings and stats — draft on memory and gut alone."}
         </p>
         <button className="btn" onClick={startDraft}>
           Start the draft

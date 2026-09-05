@@ -1,4 +1,18 @@
 """
+*** DO NOT RUN THIS AFTER HAND-EDITING ovr IN players.ts ***
+This script always re-derives ovr for the DEF/pre-2000 tier from
+reference/17-0.html's original values, completely ignoring whatever is
+currently in players.ts. If ovr for any of those players has been
+directly edited since (e.g. via the export_players_csv.py /
+import_players_csv.py spreadsheet workflow, or by hand), running this
+script will silently discard those edits and replace them with a fresh
+z-score rescale. As of the ratings overhaul where the user hand-set most
+of the pool directly, this script has no live reason to be re-run at all
+— there's no new data source for the hand-curated tier to refresh (unlike
+build_offense_stats.py's stats/accolades, which do have one: nflverse
+after each new season). Treat it as retired unless someone explicitly
+wants to bulk-rescale the hand-curated tier from scratch again.
+
 Finishes the hand-curated tier in src/data/players.ts: DEF at any era, and
 any position tagged 1960s/1970s/1980s/1990s — the players
 build_offense_stats.py deliberately leaves alone because nflverse has no

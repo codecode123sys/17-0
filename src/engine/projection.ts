@@ -5,7 +5,7 @@ import { gauss } from "./season";
 // scripts/build_offense_stats.py and scripts/recalibrate_ratings.py, which
 // rate players by standard deviations above their position/era peer group)
 // — a near-perfect roster (the best achievable 8-man roster currently
-// lands around 98) should have roughly a 1-in-10 shot at 17-0, while a
+// lands around 97) should have roughly a 1-in-10 shot at 17-0, while a
 // solid-but-unoptimized draft (~80) should still be a competitive, winning
 // team rather than a guaranteed loser. Re-tune both together if the
 // rating scale ever changes.
@@ -14,7 +14,7 @@ import { gauss } from "./season";
 export function gameWin(S: number, oppMean: number, oppSd: number, homeBonus: number): boolean {
   let opp = oppMean + gauss() * oppSd;
   opp = Math.max(40, Math.min(105, opp));
-  const p = 1 / (1 + Math.exp(-(S + homeBonus - opp) / 10));
+  const p = 1 / (1 + Math.exp(-(S + homeBonus - opp) / 9));
   return Math.random() < p;
 }
 

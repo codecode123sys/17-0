@@ -128,7 +128,17 @@ to refresh `stats`/`accolades` — it won't touch anyone's `ovr` unless you
 also pass `--overwrite-ovr`, which goes back to the fully automated
 rating described below for the whole 2000s+ tier at once.
 
-## `recalibrate_ratings.py` — rating the hand-curated tier
+## `recalibrate_ratings.py` — retired, do not run after hand-editing ratings
+
+**Don't run this anymore.** It always re-derives `ovr` for the DEF/pre-2000
+tier from `reference/17-0.html`'s original values, ignoring whatever's
+currently in `players.ts` — so if any of those ratings have been hand-edited
+since (directly, or via the `export_players_csv.py`/`import_players_csv.py`
+workflow), running it will silently discard those edits. There's no live
+data source for the hand-curated tier that would justify re-running it
+(unlike `build_offense_stats.py`'s `stats`/`accolades`, which refresh from
+real nflverse data after each season) — it's kept only for reference and for
+the rare case of wanting to bulk-rescale that tier from scratch again.
 
 A separate, no-dependency script that rates the **hand-curated tier only**
 (`DEF` at any era, and any player of any position tagged

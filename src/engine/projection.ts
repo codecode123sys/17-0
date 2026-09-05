@@ -1,12 +1,14 @@
 import { gauss } from "./season";
 
-// Opponent means and the /10 divisor below are calibrated against the
+// Opponent means and the /6 divisor below are calibrated against the
 // player pool's rating scale in src/data/players.ts (see
 // scripts/build_offense_stats.py and scripts/recalibrate_ratings.py, which
 // rate players by standard deviations above their position/era peer group)
 // — a near-perfect roster (the best achievable 8-man roster currently
-// lands around 97) should have roughly a 1-in-10 shot at 17-0, while a
-// solid-but-unoptimized draft (~80) should still be a competitive, winning
+// lands around 97, and ratings across the pool lean generous by design,
+// so a typical roster is only ~14 points behind that ceiling rather than
+// ~20+) should have roughly a 1-in-10 shot at 17-0, while a
+// solid-but-unoptimized draft (~85) should still be a competitive, winning
 // team rather than a guaranteed loser. Re-tune both together if the
 // rating scale ever changes.
 
@@ -14,7 +16,7 @@ import { gauss } from "./season";
 export function gameWin(S: number, oppMean: number, oppSd: number, homeBonus: number): boolean {
   let opp = oppMean + gauss() * oppSd;
   opp = Math.max(40, Math.min(105, opp));
-  const p = 1 / (1 + Math.exp(-(S + homeBonus - opp) / 9));
+  const p = 1 / (1 + Math.exp(-(S + homeBonus - opp) / 6));
   return Math.random() < p;
 }
 
@@ -42,11 +44,11 @@ export function playoffRun(S: number, wins: number): number {
   } else return 0;
 
   if (seed !== 1) {
-    if (!gameWin(S, 79, 7, seed <= 4 ? 2 : 0)) return 1; // Wild Card
+    if (!gameWin(S, 85, 7, seed <= 4 ? 2 : 0)) return 1; // Wild Card
   }
-  if (!gameWin(S, 82, 6, seed <= 2 ? 2 : 0)) return 2; // Divisional
-  if (!gameWin(S, 85, 5, seed <= 2 ? 2 : 0)) return 3; // Conference Championship
-  if (!gameWin(S, 87, 5, 0)) return 4; // Super Bowl (neutral site)
+  if (!gameWin(S, 88, 6, seed <= 2 ? 2 : 0)) return 2; // Divisional
+  if (!gameWin(S, 91, 5, seed <= 2 ? 2 : 0)) return 3; // Conference Championship
+  if (!gameWin(S, 93, 5, 0)) return 4; // Super Bowl (neutral site)
   return 5;
 }
 
@@ -78,7 +80,7 @@ export function simulate(S: number, seasons = 10000): Projection {
   for (let i = 0; i < seasons; i++) {
     let w = 0;
     for (let g = 0; g < 17; g++) {
-      if (gameWin(S, 77, 7, 0)) w++;
+      if (gameWin(S, 83, 7, 0)) w++;
     }
     winDist[w]++;
     totalWins += w;

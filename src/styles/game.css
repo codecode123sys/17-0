@@ -458,11 +458,22 @@
     letter-spacing: .01em;
     text-shadow: 0 1px 3px rgba(0, 0, 0, .5);
   }
-  .card .line {
+  .card .lines {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-top: 2px;
+  }
+  .card .lines .stats {
     font-size: 11px;
     color: var(--ink);
     font-family: "IBM Plex Mono", monospace;
-    margin-top: 2px;
+  }
+  .card .lines .accolades {
+    font-size: 10.5px;
+    color: var(--accent-strong);
+    font-family: "IBM Plex Mono", monospace;
+    font-style: italic;
   }
   .card.elite {
     border-color: var(--accent-strong);
@@ -881,6 +892,7 @@
   .recap .r .pos { font-family: "Oswald", sans-serif; font-weight: 700; font-size: 11px; color: var(--accent-strong); letter-spacing: .06em; }
   .recap .r .nm { font-family: "Oswald", sans-serif; font-weight: 500; font-size: 13.5px; line-height: 1.2; margin-top: 2px; }
   .recap .r .mt { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--muted); margin-top: 3px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+  .recap .r .mt.accolades { color: var(--accent-strong); font-style: italic; margin-top: 1px; }
 
   .result-actions {
     margin-top: 24px;

@@ -33,7 +33,7 @@ export function PlayerCard({
   const locked = targets.length === 0;
   // OVR drives balance/scoring internally but is never shown — it's a single
   // number trying to summarize a player, which invites arguing over whether
-  // it's "right." Real career stats/accolades (player.line) don't.
+  // it's "right." Real career stats/accolades (player.stats/accolades) don't.
   const elite = player.ovr >= 90;
 
   return (
@@ -47,7 +47,12 @@ export function PlayerCard({
           </span>
         </div>
       </div>
-      {mode === "classic" && <span className="line">{player.line}</span>}
+      {mode === "classic" && (
+        <div className="lines">
+          {player.stats && <span className="stats">{player.stats}</span>}
+          {player.accolades && <span className="accolades">{player.accolades}</span>}
+        </div>
+      )}
       {locked ? (
         <span className="locked-note">
           {(() => {

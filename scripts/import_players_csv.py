@@ -4,10 +4,10 @@ src/data/players.ts. This is the write half of the "edit ratings yourself"
 workflow described in README.md's "Editing player ratings" section.
 
 Matches rows by `id` (the row's position in players.ts — stable as long as
-you don't reorder rows in the sheet). Only `ovr` and `line` are editable;
-name/team/era/pos are ignored even if changed, since this script doesn't
-add, remove, or reorder players — it's for correcting ratings, not editing
-the roster pool itself.
+you don't reorder rows in the sheet). Only `ovr`, `stats`, and `accolades`
+are editable; name/team/era/pos are ignored even if changed, since this
+script doesn't add, remove, or reorder players — it's for correcting
+ratings and text, not editing the roster pool itself.
 
 Usage:
     python3 scripts/import_players_csv.py <path-or-url-to-csv> [--dry-run]
@@ -30,7 +30,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PLAYERS_TS = REPO_ROOT / "src" / "data" / "players.ts"
 
 ROW = re.compile(
-    r"\['((?:[^'\\]|\\.)*)', '((?:[^'\\]|\\.)*)', '(\d{4}s)', '(QB|RB|WR|TE|DEF)', (\d+), '((?:[^'\\]|\\.)*)'\]"
+    r"\['((?:[^'\\]|\\.)*)', '((?:[^'\\]|\\.)*)', '(\d{4}s)', '(QB|RB|WR|TE|DEF)', (\d+), "
+    r"'((?:[^'\\]|\\.)*)', '((?:[^'\\]|\\.)*)'\]"
 )
 
 
@@ -76,9 +77,9 @@ def main() -> None:
     pieces = []
     last_end = 0
     for i, m in enumerate(matches):
-        name, team, era, pos, ovr, line = m.groups()
+        name, team, era, pos, ovr, stats, accolades = m.groups()
         edit = by_id.get(i)
-        new_ovr, new_line = int(ovr), line
+        new_ovr, new_stats, new_accolades = int(ovr), stats, accolades
         if edit is not None:
             try:
                 candidate = int(edit["ovr"])
@@ -88,18 +89,20 @@ def main() -> None:
                 print(f"  skipping {name!r} (id {i}): ovr {candidate} out of [40,99] range", file=sys.stderr)
             else:
                 new_ovr = candidate
-            edited_line = edit.get("line", line)
-            if edited_line:
-                new_line = esc(edited_line)
-            else:
-                new_line = line
 
-        if new_ovr != int(ovr) or new_line != line:
+            edited_stats = edit.get("stats", "")
+            new_stats = esc(edited_stats) if edited_stats else stats
+            edited_accolades = edit.get("accolades", "")
+            new_accolades = esc(edited_accolades) if edited_accolades else accolades
+
+        if new_ovr != int(ovr) or new_stats != stats or new_accolades != accolades:
             changed += 1
             print(f"  {name:24} {pos:3} {era}  {ovr:>3} -> {new_ovr:>3}", file=sys.stderr)
 
         pieces.append(text[last_end : m.start()])
-        pieces.append(f"['{name}', '{team}', '{era}', '{pos}', {new_ovr}, '{new_line}']")
+        pieces.append(
+            f"['{name}', '{team}', '{era}', '{pos}', {new_ovr}, '{new_stats}', '{new_accolades}']"
+        )
         last_end = m.end()
     pieces.append(text[last_end:])
 

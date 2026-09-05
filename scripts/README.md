@@ -3,7 +3,10 @@
 `build_offense_stats.py` rates every **QB/RB/WR/TE player tagged 2000s,
 2010s, or 2020s** in `src/data/players.ts` using real per-decade stats from
 [nflverse](https://github.com/nflverse) (via the `nfl_data_py` package)
-instead of hand judgment, then regenerates that file.
+instead of hand judgment, then regenerates that file. Every player gets an
+`ovr` (used only internally, for roster balance — never shown in the
+game), a `stats` line (real cumulative counting numbers), and an
+`accolades` line (a real, verifiable highlight — see below).
 
 ## Why only offense, and only 2000+
 
@@ -21,9 +24,9 @@ rest exactly as it was:
 - **Left hand-curated, on purpose**: every `DEF` player at any era, and
   every player of any position tagged `1960s`/`1970s`/`1980s`/`1990s`.
 - **Left as-is because no match was found**: printed at the end of a run
-  (currently just Michael Vick's `2000s` entry — his federal suspension
-  years likely put his games-played for that decade under the pipeline's
-  qualifying threshold).
+  (e.g. Michael Vick's `2000s` entry — his federal suspension years likely
+  put his games-played for that decade under the pipeline's qualifying
+  threshold).
 
 ## How the rating works
 
@@ -54,8 +57,20 @@ For each matched player, in each decade:
    their own peer group — e.g. Priest Holmes' absurd 2002-03 stretch,
    not just whoever happens to rank #1 in a narrow bucket.
 
-The human-readable stat line (e.g. `4,906 rush yds · 31 TD (2020s)`) is a
-straight cumulative decade total, separate from the rating itself.
+The `stats` line (e.g. `4,906 rush yds · 31 TD`) is a straight cumulative
+decade total, separate from the rating itself.
+
+`accolades` is where this pipeline can't just reuse the pool's existing
+hand-typed blurbs, because there generally aren't any for this tier — and
+nflverse has no Pro Bowl/All-Pro dataset to source real ones from either.
+Rather than guess at award history (the exact kind of thing that's wrong
+half the time for a role player, not just a star), this computes something
+100% checkable straight from the same per-season data already pulled:
+whether the player's best qualifying season that decade ranked #1, top 3,
+or top 10 in the league at their position's headline counting stat
+(passing/rushing/receiving yards). "Led the NFL in receiving yards, 2024"
+is always literally true. If a player never cracked the top 10 in any
+single season, `accolades` is left blank rather than inventing something.
 
 ## Running it
 
@@ -112,6 +127,31 @@ probability constants are calibrated against (see the comments in
 `RATING_CENTER`/`RATING_SPREAD`/`RATING_FLOOR` in either script, re-tune
 those too, or a merely-solid roster will look like a guaranteed loser (or
 a near-perfect one will look too easy).
+
+### Splitting the hand-curated blurb into `stats`/`accolades`
+
+This tier's players never had separate stats/accolades fields — just one
+hand-typed blurb per player in `reference/17-0.html` (e.g. `"27,989 yds ·
+212 TD · 4x SB"`). This script splits it: a `·`-separated segment counts
+as a real counting stat if it starts with a number and names a countable
+unit (`yds`, `TD`, `INT`, `rec`, `sk`/`sacks`, `tackles`, `rtg`, `avg`);
+everything else — MVP/DPOY/Pro Bowl/All-Pro mentions, Hall of Fame status,
+nicknames, single-season records — becomes the accolade.
+
+`DEF` blurbs get one extra step first, since defense has no real
+countable box-score stat available across most of NFL history: if the
+blurb leads with a recognized position code (`DT`, `DE`, `LB`, `CB`, `S`,
+`edge`, etc. — matched against a fixed whitelist, not by shape, since
+nicknames like "Mr. Cowboy" or awards like "DROY '07" are just as short
+and just as often capitalized), that code becomes the `stats` line and
+the segment classifier runs on the rest. A DEF blurb with no recognized
+role code is pure scouting prose (`"ageless interior anchor"`) and goes to
+`accolades` in full, with `stats` left blank — which is accurate, not a
+gap, since that tier never had a real stat to show anyway.
+
+Like the ovr rescale above, this always re-derives from
+`reference/17-0.html`'s original blurb, never from whatever's currently in
+`players.ts`, so it's safe to re-run any time.
 
 ## Editing ratings by hand
 

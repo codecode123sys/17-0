@@ -101,8 +101,8 @@ export function Results({ game }: { game: GameController }) {
               <div className="nm">{p.name}</div>
               <div className="mt">
                 <TeamBadge team={p.team} /> {p.era}
-                {mode === "classic" && ` · OVR ${p.ovr}`}
               </div>
+              {mode === "classic" && <div className="mt">{p.line}</div>}
             </div>
           );
         })}

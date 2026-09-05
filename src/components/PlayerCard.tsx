@@ -31,10 +31,13 @@ export function PlayerCard({
     return true;
   });
   const locked = targets.length === 0;
-  const tierClass = player.ovr >= 90 ? "tier1" : "tier2";
+  // OVR drives balance/scoring internally but is never shown — it's a single
+  // number trying to summarize a player, which invites arguing over whether
+  // it's "right." Real career stats/accolades (player.line) don't.
+  const elite = player.ovr >= 90;
 
   return (
-    <div className={"card" + (locked ? " locked" : "")}>
+    <div className={"card" + (locked ? " locked" : "") + (elite ? " elite" : "")}>
       <div className="card-head">
         <PlayerPortrait player={player} />
         <div className="card-id">
@@ -44,12 +47,7 @@ export function PlayerCard({
           </span>
         </div>
       </div>
-      {mode === "classic" && (
-        <>
-          <span className="line">{player.line}</span>
-          <span className={"ovr " + tierClass}>OVR {player.ovr}</span>
-        </>
-      )}
+      {mode === "classic" && <span className="line">{player.line}</span>}
       {locked ? (
         <span className="locked-note">
           {(() => {

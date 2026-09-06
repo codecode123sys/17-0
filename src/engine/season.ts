@@ -48,17 +48,19 @@ export interface League {
 /** Builds the other 31 real NFL teams and drops your roster into one random
  *  division slot.
  *
- *  The 83 baseline (and the /6 divisor in playGame/playGameBool below) are
+ *  The 83 baseline (and the /7 divisor in playGame/playGameBool below) are
  *  calibrated against the player rating scale in src/data/players.ts (see
  *  scripts/build_offense_stats.py and scripts/recalibrate_ratings.py,
  *  which rate players by standard deviations above their position/era peer
  *  group — the best achievable 8-man roster currently lands around 97,
  *  and ratings across the pool lean generous by design — the achievable
  *  ceiling and typical roster strength sit closer together than a purely
- *  stats-derived scale would produce) —
- *  re-tune both together if that scale ever changes, or a
- *  solid-but-unoptimized roster will look like a guaranteed loser (or a
- *  near-perfect one will look too easy). */
+ *  stats-derived scale would produce) — the divisor was tightened from 6 to
+ *  7 to make a perfect 17-0 run rarer without meaningfully changing an
+ *  average roster's win rate (elite-roster 17-0 odds ~15% -> ~9%; average
+ *  roster's mean win total barely moves). Re-tune both together if that
+ *  scale ever changes, or a solid-but-unoptimized roster will look like a
+ *  guaranteed loser (or a near-perfect one will look too easy). */
 export function buildLeague(playerStrength: number): League {
   const div = DIVISIONS[(Math.random() * DIVISIONS.length) | 0];
   const conf = div.slice(0, 3);
@@ -133,7 +135,7 @@ export function buildSchedule(league: Team[], div: string): ScheduleWeek[] {
 // ---------- games ----------
 
 export function playGameBool(sA: number, sB: number, aHome: boolean): boolean {
-  return Math.random() < 1 / (1 + Math.exp(-(sA + (aHome ? 2 : 0) - sB) / 6));
+  return Math.random() < 1 / (1 + Math.exp(-(sA + (aHome ? 2 : 0) - sB) / 7));
 }
 
 export interface GameResult {
@@ -145,7 +147,7 @@ export interface GameResult {
 /** A single simulated, scored game — used for every game the player actually plays. */
 export function playGame(S: number, ostr: number, home: boolean | null): GameResult {
   const eff = S + (home === true ? 2 : 0);
-  const win = Math.random() < 1 / (1 + Math.exp(-(eff - ostr) / 6));
+  const win = Math.random() < 1 / (1 + Math.exp(-(eff - ostr) / 7));
   const loser = Math.round(Math.max(3, Math.min(45, 20 + gauss() * 6)));
   let margin = Math.round(Math.abs(gauss() * 8) + 1 + Math.abs(eff - ostr) * 0.22);
   margin = Math.max(1, Math.min(44, margin));

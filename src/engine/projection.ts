@@ -1,22 +1,24 @@
 import { gauss } from "./season";
 
-// Opponent means and the /6 divisor below are calibrated against the
+// Opponent means and the /7 divisor below are calibrated against the
 // player pool's rating scale in src/data/players.ts (see
 // scripts/build_offense_stats.py and scripts/recalibrate_ratings.py, which
 // rate players by standard deviations above their position/era peer group)
 // — a near-perfect roster (the best achievable 8-man roster currently
 // lands around 97, and ratings across the pool lean generous by design,
 // so a typical roster is only ~14 points behind that ceiling rather than
-// ~20+) should have roughly a 1-in-10 shot at 17-0, while a
+// ~20+) should have roughly a 1-in-11 shot at 17-0, while a
 // solid-but-unoptimized draft (~85) should still be a competitive, winning
-// team rather than a guaranteed loser. Re-tune both together if the
-// rating scale ever changes.
+// team rather than a guaranteed loser. (The divisor was tightened from 6
+// to 7 to make a perfect run rarer without meaningfully touching an
+// average roster's win rate — re-tune both together if the rating scale
+// ever changes.)
 
 /** Win probability against a randomly-drawn opponent of the given mean/spread. */
 export function gameWin(S: number, oppMean: number, oppSd: number, homeBonus: number): boolean {
   let opp = oppMean + gauss() * oppSd;
   opp = Math.max(40, Math.min(105, opp));
-  const p = 1 / (1 + Math.exp(-(S + homeBonus - opp) / 6));
+  const p = 1 / (1 + Math.exp(-(S + homeBonus - opp) / 7));
   return Math.random() < p;
 }
 

@@ -91,7 +91,7 @@ export function History({ game }: { game: GameController }) {
                   <div className="md-info">
                     <div className="md-name">{player.name}</div>
                     <div className="md-meta mono">
-                      <TeamBadge team={player.team} /> {player.era}
+                      <TeamBadge team={player.team} /> {player.era} · OVR {player.ovr}
                     </div>
                   </div>
                   <div className="md-count mono">&times;{count}</div>

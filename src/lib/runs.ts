@@ -2,7 +2,11 @@ import { SLOTS } from "../engine/draft";
 import type { FilledSlots } from "../engine/draft";
 import type { SeasonState } from "../engine/season";
 import { summarizeSeason } from "../engine/season";
-import { getSupabase } from "./supabase";
+
+const RUNS_KEY = "seventeen-oh-runs";
+// Capped so a long-time player's localStorage doesn't grow without bound —
+// this is meant as "your last several seasons," not a permanent archive.
+const MAX_RUNS = 50;
 
 export interface DraftedPlayer {
   name: string;
@@ -25,24 +29,30 @@ export interface Run {
   players: Record<string, DraftedPlayer>;
 }
 
-/** Saves one completed season to the signed-in user's run history. A no-op
- * (never throws) when Supabase isn't configured or no one's signed in — this
- * is an optional extra on top of the game, never something that can break
- * it. Mirrors logSeason.ts's payload shape. */
-export async function saveRun(userId: string, season: SeasonState, filled: FilledSlots): Promise<void> {
-  const supabase = await getSupabase();
-  if (!supabase) return;
-
-  const summary = summarizeSeason(season);
-  const players: Record<string, DraftedPlayer> = {};
-  for (const slot of SLOTS) {
-    const p = filled[slot.key];
-    if (p) players[slot.key.toLowerCase()] = { name: p.name, team: p.team, era: p.era, ovr: p.ovr };
-  }
-
+/** Every saved run on this device, most recent first. Local to this browser
+ * only — there's no account system, so nothing here syncs across devices. */
+export function loadRuns(): Run[] {
   try {
-    await supabase.from("runs").insert({
-      user_id: userId,
+    return JSON.parse(localStorage.getItem(RUNS_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+/** Saves one completed season to this device's run history. Never throws —
+ * a failed save (e.g. localStorage disabled/full) should never affect
+ * gameplay. */
+export function saveRun(season: SeasonState, filled: FilledSlots): void {
+  try {
+    const players: Record<string, DraftedPlayer> = {};
+    for (const slot of SLOTS) {
+      const p = filled[slot.key];
+      if (p) players[slot.key.toLowerCase()] = { name: p.name, team: p.team, era: p.era, ovr: p.ovr };
+    }
+    const summary = summarizeSeason(season);
+    const run: Run = {
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
       strength: season.strength,
       wins: season.wins,
       losses: season.losses,
@@ -52,27 +62,10 @@ export async function saveRun(userId: string, season: SeasonState, filled: Fille
       result: season.result,
       outcome_text: summary.outcomeText,
       players,
-    });
+    };
+    const runs = [run, ...loadRuns()].slice(0, MAX_RUNS);
+    localStorage.setItem(RUNS_KEY, JSON.stringify(runs));
   } catch {
-    /* best-effort — a failed save should never affect gameplay */
-  }
-}
-
-/** The signed-in user's past runs, most recent first. Returns an empty
- * array (never throws) on any failure, including Supabase not being
- * configured. */
-export async function fetchRuns(userId: string): Promise<Run[]> {
-  const supabase = await getSupabase();
-  if (!supabase) return [];
-  try {
-    const { data, error } = await supabase
-      .from("runs")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
-    if (error || !data) return [];
-    return data as Run[];
-  } catch {
-    return [];
+    /* ignore */
   }
 }

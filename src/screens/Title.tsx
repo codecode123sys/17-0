@@ -1,12 +1,10 @@
-import { AccountBar } from "../components/AccountBar";
 import type { GameController } from "../state/useGame";
 
 export function Title({ game }: { game: GameController }) {
-  const { mode, setMode, startDraft, best } = game;
+  const { mode, setMode, startDraft, best, viewHistory } = game;
 
   return (
     <section className="view">
-      <AccountBar game={game} />
       <div className="board">
         <div className="eyebrow">The perfect season</div>
         <div className="score">17&ndash;0</div>
@@ -39,6 +37,11 @@ export function Title({ game }: { game: GameController }) {
         <button className="btn" onClick={startDraft}>
           Start the draft
         </button>
+        {!!best?.plays && (
+          <button className="btn ghost small" onClick={viewHistory}>
+            My runs
+          </button>
+        )}
       </div>
 
       {best && (

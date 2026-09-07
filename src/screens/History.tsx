@@ -4,19 +4,16 @@ import { TeamBadge } from "../components/TeamBadge";
 import type { GameController } from "../state/useGame";
 
 export function History({ game }: { game: GameController }) {
-  const { runs, runsLoading, goHome } = game;
+  const { runs, goHome } = game;
 
   return (
     <section className="view">
       <div className="result-board">
         <div className="verdict">Your past runs</div>
-        <div className="sub">every completed season, most recent first</div>
+        <div className="sub">every completed season on this device, most recent first</div>
       </div>
 
-      {runsLoading && <p className="mode-note">Loading…</p>}
-      {!runsLoading && runs.length === 0 && (
-        <p className="mode-note">No saved runs yet — finish a season while signed in to see it here.</p>
-      )}
+      {runs.length === 0 && <p className="mode-note">No saved runs yet — finish a season to see it here.</p>}
 
       {runs.map((run) => (
         <div key={run.id} className="run-card">

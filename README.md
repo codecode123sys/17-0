@@ -127,89 +127,22 @@ function doPost(e) {
 Download the collected data as a real `.xlsx` anytime from the sheet:
 **File → Download → Microsoft Excel (.xlsx)**.
 
-## Accounts & run history (optional)
+## Run history
 
-Players can create an account (username + email + password) to save
-every completed season and browse it later from "My runs." This is
-entirely separate from the season logging above — that's anonymous
-aggregate telemetry across every visitor, this is per-user history.
-Like the Sheets webhook, it's fully optional: with no Supabase project
-configured, the sign-in UI simply doesn't render and nothing else
-changes. The Supabase client itself is also lazy-loaded (it's a heavy
-package, ~55KB gzipped) — it only downloads once someone actually opens
-the account UI, so it costs nothing for players who never sign in.
+Every completed season is saved to `localStorage` on the player's own
+device (see `src/lib/runs.ts`) and browsable from "My runs" on the title
+screen (shown once they've played at least one season). This is
+per-device, not a real account — there's no sign-in, no external
+service, and nothing to configure. It's separate from the season
+logging above, which is anonymous aggregate telemetry across every
+visitor rather than one player's own history.
 
-Setup:
-
-1. Create a free project at [supabase.com](https://supabase.com).
-2. In the dashboard's **SQL Editor**, run:
-
-```sql
-create table runs (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users not null,
-  created_at timestamptz default now(),
-  strength int not null,
-  wins int not null,
-  losses int not null,
-  seed int,
-  division text,
-  div_winner boolean,
-  result int not null,
-  outcome_text text not null,
-  players jsonb not null
-);
-
-alter table runs enable row level security;
-
-create policy "users manage their own runs" on runs
-  for all using (auth.uid() = user_id);
-
--- One row per account, holding the username chosen at sign-up (see the
--- trigger below) and a home for any other per-player data later.
-create table profiles (
-  id uuid primary key references auth.users on delete cascade,
-  username text unique not null,
-  created_at timestamptz default now()
-);
-
-alter table profiles enable row level security;
-
-create policy "users manage their own profile" on profiles
-  for all using (auth.uid() = id);
-
--- Auto-creates a profiles row from the username passed at sign-up
--- (client sends it as auth metadata — see src/lib/useAuth.ts's signUp).
-create function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, username)
-  values (new.id, new.raw_user_meta_data->>'username');
-  return new;
-end;
-$$ language plpgsql security definer;
-
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
-```
-
-3. **Authentication → Providers → Email**: turn **off** "Confirm email."
-   With it on, `signUp` won't return a session until the player clicks a
-   confirmation link, which reintroduces the same email round-trip we're
-   avoiding by using a password instead of a magic link.
-4. **Project Settings → API**: copy the **Project URL** and the
-   publishable/anon key (not the secret/service-role key — that one must
-   never go in client-side code, and this project has no use for it at
-   all since there's no backend).
-5. Copy `.env.example` to `.env.local` and set `VITE_SUPABASE_URL` and
-   `VITE_SUPABASE_ANON_KEY` to those two values. Set the same two in
-   Vercel's **Project Settings → Environment Variables** for production,
-   then redeploy.
-
-Nothing else to build — the client talks to Supabase directly, and row
-level security (the two policies above) is what keeps one signed-in
-player from ever seeing another's runs or profile.
+An account-based version (sign-in, history synced across devices) was
+tried via Supabase and rolled back — real accounts add a genuine
+dependency (an external service to configure and debug) for a feature
+that, at this stage, a local device history serves just as well. Worth
+revisiting once cross-device history is something players actually ask
+for.
 
 ## Commands
 

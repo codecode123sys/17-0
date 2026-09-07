@@ -14,8 +14,7 @@ import type { Projection } from "../engine/projection";
 import { enterSeason, stepSeason, summarizeSeason } from "../engine/season";
 import type { SeasonState, SeasonSummary } from "../engine/season";
 import { logSeasonResult } from "../lib/logSeason";
-import { useAuth } from "../lib/useAuth";
-import { fetchRuns, saveRun } from "../lib/runs";
+import { loadRuns, saveRun } from "../lib/runs";
 import type { Run } from "../lib/runs";
 
 export type Screen = "title" | "draft" | "season" | "results" | "history";
@@ -89,10 +88,8 @@ export function useGame() {
   const [projection, setProjection] = useState<Projection | null>(null);
   const [seasonSummary, setSeasonSummary] = useState<SeasonSummary | null>(null);
 
-  // accounts + run history
-  const auth = useAuth();
+  // run history (local to this device — no account system)
   const [runs, setRuns] = useState<Run[]>([]);
-  const [runsLoading, setRunsLoading] = useState(false);
 
   useEffect(() => {
     setBest(loadBest());
@@ -183,7 +180,7 @@ export function useGame() {
       bumpPlays();
       setBest(loadBest());
       logSeasonResult(season, filled);
-      if (auth.user) void saveRun(auth.user.id, season, filled);
+      saveRun(season, filled);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [season?.phase]);
@@ -230,13 +227,9 @@ export function useGame() {
   }, []);
 
   const viewHistory = useCallback(() => {
-    if (!auth.user) return;
+    setRuns(loadRuns());
     setScreen("history");
-    setRunsLoading(true);
-    fetchRuns(auth.user.id)
-      .then(setRuns)
-      .finally(() => setRunsLoading(false));
-  }, [auth.user]);
+  }, []);
 
   const draftAgain = startDraft;
 
@@ -269,10 +262,8 @@ export function useGame() {
     showBreakdown,
     draftAgain,
     goHome,
-    // accounts + run history
-    auth,
+    // run history
     runs,
-    runsLoading,
     viewHistory,
   };
 }

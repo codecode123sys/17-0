@@ -2,7 +2,7 @@ import { SLOTS } from "../engine/draft";
 import type { FilledSlots } from "../engine/draft";
 import type { SeasonState } from "../engine/season";
 import { summarizeSeason } from "../engine/season";
-import { supabase } from "./supabase";
+import { getSupabase } from "./supabase";
 
 export interface DraftedPlayer {
   name: string;
@@ -30,6 +30,7 @@ export interface Run {
  * is an optional extra on top of the game, never something that can break
  * it. Mirrors logSeason.ts's payload shape. */
 export async function saveRun(userId: string, season: SeasonState, filled: FilledSlots): Promise<void> {
+  const supabase = await getSupabase();
   if (!supabase) return;
 
   const summary = summarizeSeason(season);
@@ -61,6 +62,7 @@ export async function saveRun(userId: string, season: SeasonState, filled: Fille
  * array (never throws) on any failure, including Supabase not being
  * configured. */
 export async function fetchRuns(userId: string): Promise<Run[]> {
+  const supabase = await getSupabase();
   if (!supabase) return [];
   try {
     const { data, error } = await supabase

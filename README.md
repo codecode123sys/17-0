@@ -129,13 +129,15 @@ Download the collected data as a real `.xlsx` anytime from the sheet:
 
 ## Accounts & run history (optional)
 
-Players can sign in (email magic link, no password) to save every
-completed season to their own account and browse it later from "My
-runs." This is entirely separate from the season logging above — that's
-anonymous aggregate telemetry across every visitor, this is per-user
-history. Like the Sheets webhook, it's fully optional: with no Supabase
-project configured, the sign-in UI simply doesn't render and nothing
-else changes.
+Players can create an account (username + email + password) to save
+every completed season and browse it later from "My runs." This is
+entirely separate from the season logging above — that's anonymous
+aggregate telemetry across every visitor, this is per-user history.
+Like the Sheets webhook, it's fully optional: with no Supabase project
+configured, the sign-in UI simply doesn't render and nothing else
+changes. The Supabase client itself is also lazy-loaded (it's a heavy
+package, ~55KB gzipped) — it only downloads once someone actually opens
+the account UI, so it costs nothing for players who never sign in.
 
 Setup:
 
@@ -162,22 +164,52 @@ alter table runs enable row level security;
 
 create policy "users manage their own runs" on runs
   for all using (auth.uid() = user_id);
+
+-- One row per account, holding the username chosen at sign-up (see the
+-- trigger below) and a home for any other per-player data later.
+create table profiles (
+  id uuid primary key references auth.users on delete cascade,
+  username text unique not null,
+  created_at timestamptz default now()
+);
+
+alter table profiles enable row level security;
+
+create policy "users manage their own profile" on profiles
+  for all using (auth.uid() = id);
+
+-- Auto-creates a profiles row from the username passed at sign-up
+-- (client sends it as auth metadata — see src/lib/useAuth.ts's signUp).
+create function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profiles (id, username)
+  values (new.id, new.raw_user_meta_data->>'username');
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
 ```
 
-3. **Authentication → Sign In / Providers**: Email should already be
-   enabled by default. Under **Authentication → URL Configuration**, add
-   your production URL (e.g. `https://www.draft17-0.com`) to the **Redirect
-   URLs** allow-list, or the magic link will fail to complete sign-in.
-4. **Project Settings → API**: copy the **Project URL** and the **anon
-   public** key.
+3. **Authentication → Providers → Email**: turn **off** "Confirm email."
+   With it on, `signUp` won't return a session until the player clicks a
+   confirmation link, which reintroduces the same email round-trip we're
+   avoiding by using a password instead of a magic link.
+4. **Project Settings → API**: copy the **Project URL** and the
+   publishable/anon key (not the secret/service-role key — that one must
+   never go in client-side code, and this project has no use for it at
+   all since there's no backend).
 5. Copy `.env.example` to `.env.local` and set `VITE_SUPABASE_URL` and
    `VITE_SUPABASE_ANON_KEY` to those two values. Set the same two in
    Vercel's **Project Settings → Environment Variables** for production,
    then redeploy.
 
 Nothing else to build — the client talks to Supabase directly, and row
-level security (the policy above) is what keeps one signed-in player from
-ever seeing another's runs.
+level security (the two policies above) is what keeps one signed-in
+player from ever seeing another's runs or profile.
 
 ## Commands
 

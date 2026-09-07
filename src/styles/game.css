@@ -233,6 +233,47 @@
   }
   .best strong { color: var(--ink); font-family: "IBM Plex Mono", monospace; }
 
+  /* ---------- Accounts + run history ---------- */
+  .account-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .account-bar input {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--ink);
+    padding: 8px 11px;
+    font-size: 13px;
+    min-width: 0;
+    flex: 1 1 200px;
+  }
+  .account-bar input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .btn.small { padding: 8px 14px; font-size: 12px; }
+  .account-status { flex-basis: 100%; text-align: center; }
+
+  .run-card {
+    margin-top: 18px;
+    padding: 16px 18px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .run-card-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .run-outcome { font-family: "Oswald", sans-serif; font-weight: 600; font-size: 14px; }
+  .run-date { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .run-recap { margin-top: 12px; }
+
   /* ---------- Draft ---------- */
   .draft-head {
     display: flex;

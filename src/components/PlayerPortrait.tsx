@@ -4,7 +4,7 @@ import type { Player } from "../data/players";
 
 /** A generated team-colored tile with a faint helmet mark and the player's
  *  initials — never a real photo. */
-export function PlayerPortrait({ player }: { player: Player }) {
+export function PlayerPortrait({ player }: { player: Pick<Player, "name" | "team"> }) {
   const p = portraitFor(player);
   const style = { "--c1": p.primary, "--c2": p.secondary } as CSSProperties;
   return (

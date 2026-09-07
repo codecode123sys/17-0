@@ -127,6 +127,58 @@ function doPost(e) {
 Download the collected data as a real `.xlsx` anytime from the sheet:
 **File → Download → Microsoft Excel (.xlsx)**.
 
+## Accounts & run history (optional)
+
+Players can sign in (email magic link, no password) to save every
+completed season to their own account and browse it later from "My
+runs." This is entirely separate from the season logging above — that's
+anonymous aggregate telemetry across every visitor, this is per-user
+history. Like the Sheets webhook, it's fully optional: with no Supabase
+project configured, the sign-in UI simply doesn't render and nothing
+else changes.
+
+Setup:
+
+1. Create a free project at [supabase.com](https://supabase.com).
+2. In the dashboard's **SQL Editor**, run:
+
+```sql
+create table runs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users not null,
+  created_at timestamptz default now(),
+  strength int not null,
+  wins int not null,
+  losses int not null,
+  seed int,
+  division text,
+  div_winner boolean,
+  result int not null,
+  outcome_text text not null,
+  players jsonb not null
+);
+
+alter table runs enable row level security;
+
+create policy "users manage their own runs" on runs
+  for all using (auth.uid() = user_id);
+```
+
+3. **Authentication → Sign In / Providers**: Email should already be
+   enabled by default. Under **Authentication → URL Configuration**, add
+   your production URL (e.g. `https://www.draft17-0.com`) to the **Redirect
+   URLs** allow-list, or the magic link will fail to complete sign-in.
+4. **Project Settings → API**: copy the **Project URL** and the **anon
+   public** key.
+5. Copy `.env.example` to `.env.local` and set `VITE_SUPABASE_URL` and
+   `VITE_SUPABASE_ANON_KEY` to those two values. Set the same two in
+   Vercel's **Project Settings → Environment Variables** for production,
+   then redeploy.
+
+Nothing else to build — the client talks to Supabase directly, and row
+level security (the policy above) is what keeps one signed-in player from
+ever seeing another's runs.
+
 ## Commands
 
 ```bash

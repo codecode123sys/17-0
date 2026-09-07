@@ -1,3 +1,4 @@
+import { AccountBar } from "../components/AccountBar";
 import type { GameController } from "../state/useGame";
 
 export function Title({ game }: { game: GameController }) {
@@ -5,6 +6,7 @@ export function Title({ game }: { game: GameController }) {
 
   return (
     <section className="view">
+      <AccountBar game={game} />
       <div className="board">
         <div className="eyebrow">The perfect season</div>
         <div className="score">17&ndash;0</div>

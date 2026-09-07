@@ -8,7 +8,7 @@ export function badgeFor(team: string) {
 
 /** Data for a <PlayerPortrait> component — a generated team-colored tile
  *  with the player's initials, never a real photo. */
-export function portraitFor(player: Player) {
+export function portraitFor(player: Pick<Player, "name" | "team">) {
   const initials = player.name
     .split(/\s+/)
     .map((w) => w.charAt(0))

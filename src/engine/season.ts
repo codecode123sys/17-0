@@ -16,6 +16,58 @@ export function clampStr(v: number): number {
   return r < 52 ? 52 : r > 99 ? 99 : r;
 }
 
+// ---------- perfect-run odds curve ----------
+
+// Maps a roster's real strength to the *effective* strength used only for
+// games in a season that's still undefeated — i.e. this only ever touches
+// the "still chasing 17-0" tail, never an ordinary team's normal win total
+// once it's already lost a game. Calibrated (via a Monte Carlo search
+// against this file's own game-probability model, /scripts equivalent) so
+// the resulting real chance of running the table follows a deliberately
+// simple, requested curve: below 85, essentially impossible; 85-89 climbs
+// from a sliver of a chance to 2%; at 90 it jumps to 8%, then rises exactly
+// 1 percentage point per additional strength point above 90. Re-run the
+// calibration (see git history for the search script) if the /6-or-/7
+// divisor or opponent baseline in gameWin/playGame ever changes, since this
+// table is only valid against the current model.
+const PERFECT_RUN_BOOST: readonly [number, number][] = [
+  [85, 85.0],
+  [86, 90.11],
+  [87, 91.27],
+  [88, 92.21],
+  [89, 92.82],
+  [90, 96.53],
+  [91, 96.92],
+  [92, 97.28],
+  [93, 97.63],
+  [94, 97.97],
+  [95, 98.3],
+  [96, 98.57],
+  [97, 98.86],
+  [97.74, 99.08],
+];
+
+/** The effective strength to use for a game in a season that hasn't lost
+ * yet. Below the table's floor, returns S unchanged (no boost — running the
+ * table is meant to stay essentially impossible down there). Linearly
+ * interpolates between calibrated points, and holds flat at the last
+ * point's boost beyond the achievable roster ceiling. */
+export function boostedStrength(S: number): number {
+  const table = PERFECT_RUN_BOOST;
+  if (S <= table[0][0]) return S;
+  const last = table[table.length - 1];
+  if (S >= last[0]) return last[1];
+  for (let i = 1; i < table.length; i++) {
+    const [x1, y1] = table[i];
+    if (S <= x1) {
+      const [x0, y0] = table[i - 1];
+      const t = (S - x0) / (x1 - x0);
+      return y0 + t * (y1 - y0);
+    }
+  }
+  return last[1];
+}
+
 export function shuffle<T>(a: T[]): T[] {
   const arr = a.slice();
   for (let i = arr.length - 1; i > 0; i--) {
@@ -144,10 +196,16 @@ export interface GameResult {
   op: number;
 }
 
-/** A single simulated, scored game — used for every game the player actually plays. */
-export function playGame(S: number, ostr: number, home: boolean | null): GameResult {
+/** A single simulated, scored game — used for every game the player actually
+ * plays. `winStrength` (defaults to `S`) is the strength used only for the
+ * win/loss coin flip — a season still chasing 17-0 passes its boosted
+ * strength here (see `boostedStrength`) — while the displayed score always
+ * reflects the roster's real strength gap, so a boosted-but-still-close
+ * game doesn't misleadingly look like a blowout. */
+export function playGame(S: number, ostr: number, home: boolean | null, winStrength: number = S): GameResult {
   const eff = S + (home === true ? 2 : 0);
-  const win = Math.random() < 1 / (1 + Math.exp(-(eff - ostr) / 7));
+  const effWin = winStrength + (home === true ? 2 : 0);
+  const win = Math.random() < 1 / (1 + Math.exp(-(effWin - ostr) / 7));
   const loser = Math.round(Math.max(3, Math.min(45, 20 + gauss() * 6)));
   let margin = Math.round(Math.abs(gauss() * 8) + 1 + Math.abs(eff - ostr) * 0.22);
   margin = Math.max(1, Math.min(44, margin));
@@ -386,7 +444,11 @@ export function stepSeason(s: SeasonState): SeasonState {
     let losses = s.losses;
     if (idx >= 0) {
       const g = s.sched[idx];
-      const o = playGame(s.strength, g.ostr, g.home);
+      // Still undefeated? Use the boosted win-probability strength for this
+      // game only — see boostedStrength's doc comment. A team that's
+      // already lost gets no boost, same as always.
+      const winStrength = s.losses === 0 ? boostedStrength(s.strength) : s.strength;
+      const o = playGame(s.strength, g.ostr, g.home, winStrength);
       sched = s.sched.slice();
       sched[idx] = { ...g, played: true, win: o.win, mp: o.mp, op: o.op };
       if (o.win) wins++;

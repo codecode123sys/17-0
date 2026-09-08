@@ -1,18 +1,14 @@
-import { gauss } from "./season";
+import { boostedStrength, gauss } from "./season";
 
 // Opponent means and the /7 divisor below are calibrated against the
 // player pool's rating scale in src/data/players.ts (see
 // scripts/build_offense_stats.py and scripts/recalibrate_ratings.py, which
 // rate players by standard deviations above their position/era peer group)
-// — a near-perfect roster (the best achievable 8-man roster currently
-// lands around 97, and ratings across the pool lean generous by design,
-// so a typical roster is only ~14 points behind that ceiling rather than
-// ~20+) should have roughly a 1-in-11 shot at 17-0, while a
-// solid-but-unoptimized draft (~85) should still be a competitive, winning
-// team rather than a guaranteed loser. (The divisor was tightened from 6
-// to 7 to make a perfect run rarer without meaningfully touching an
-// average roster's win rate — re-tune both together if the rating scale
-// ever changes.)
+// so a solid-but-unoptimized draft (~85) is still a competitive, winning
+// team rather than a guaranteed loser. The actual real chance of running
+// the table follows a separate, deliberately explicit curve layered on top
+// — see `boostedStrength` in season.ts — rather than falling wherever this
+// base model happens to put it.
 
 /** Win probability against a randomly-drawn opponent of the given mean/spread. */
 export function gameWin(S: number, oppMean: number, oppSd: number, homeBonus: number): boolean {
@@ -79,10 +75,13 @@ export function simulate(S: number, seasons = 10000): Projection {
   let byes = 0;
   let totalWins = 0;
 
+  const boosted = boostedStrength(S);
   for (let i = 0; i < seasons; i++) {
     let w = 0;
+    let perfectSoFar = true;
     for (let g = 0; g < 17; g++) {
-      if (gameWin(S, 83, 7, 0)) w++;
+      if (gameWin(perfectSoFar ? boosted : S, 83, 7, 0)) w++;
+      else perfectSoFar = false;
     }
     winDist[w]++;
     totalWins += w;

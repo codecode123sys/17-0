@@ -20,7 +20,7 @@ import type { Run } from "../lib/runs";
 export type Screen = "title" | "draft" | "season" | "results" | "history" | "leaderboard";
 export type Mode = "classic" | "blind";
 
-const RESPIN_START = 3;
+const RESPIN_START = 2;
 const STORAGE_KEY = "seventeen-oh-best";
 // One game at a time, with a deliberate pause so each result is readable
 // before the next one plays.

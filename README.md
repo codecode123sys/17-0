@@ -174,6 +174,7 @@ function doGet(e) {
     var now = new Date();
     var ms = { day: 1, week: 7, month: 30, year: 365 }[period];
     var cutoff = ms ? new Date(now.getTime() - ms * 24 * 60 * 60 * 1000) : new Date(0);
+    var limit = { day: 25, week: 25, month: 50, year: 100 }[period] || 25;
 
     var entries = values
       .slice(1)
@@ -204,7 +205,7 @@ function doGet(e) {
       .sort(function (a, b) {
         return b.wins - a.wins || b.strength - a.strength;
       })
-      .slice(0, 25);
+      .slice(0, limit);
 
     return ContentService.createTextOutput(
       JSON.stringify({

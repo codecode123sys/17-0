@@ -25,19 +25,17 @@ export function clampStr(v: number): number {
 // against this file's own game-probability model, /scripts equivalent) so
 // the resulting real chance of running the table follows a deliberately
 // simple, requested curve: essentially impossible at/below 87, a linear
-// ramp from 0 at 87 to 2.5% at 89, then explicit anchors at 90 (5%) and
-// 91 (6%), continuing the same +1 percentage point per additional
-// strength point above that (matching 90->91's own slope). This flattens
-// the old jump at 90 (previously 7%) considerably while raising 89's odds
-// relative to the previous curve — a deliberate reshaping, not just
-// another flat shift. Re-run the calibration (see git history for the
-// search script) if the /6-or-/7 divisor or opponent baseline in
-// gameWin/playGame ever changes, since this table is only valid against
-// the current model.
+// ramp through 88 (0.5%) and 89 (1%) — restored to their pre-reshape
+// values after the 88/89 bump from the previous version turned out to be
+// an unwanted side effect — then a jump at 90 (5%) and 91 (6%), continuing
+// the same +1 percentage point per additional strength point above that.
+// Re-run the calibration (see git history for the search script) if the
+// /6-or-/7 divisor or opponent baseline in gameWin/playGame ever changes,
+// since this table is only valid against the current model.
 const PERFECT_RUN_BOOST: readonly [number, number][] = [
   [87, 87.0],
-  [88, 91.84],
-  [89, 93.33],
+  [88, 90.11],
+  [89, 91.34],
   [90, 95.14],
   [91, 95.66],
   [92, 96.12],

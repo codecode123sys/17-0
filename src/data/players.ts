@@ -830,6 +830,14 @@ const RAW: [string, string, Era, Position, number, string, string][] = [
   ['Jayden Daniels', 'Commanders', '2020s', 'QB', 85, '4,830 pass yds · 33 TD · 12 INT', ''],
   ['Jaxson Dart', 'Giants', '2020s', 'QB', 77, '2,272 pass yds · 15 TD · 5 INT', ''],
   ['Cam Skattebo', 'Giants', '2020s', 'RB', 81, '410 rush yds · 5 TD · 24 rec', ''],
+  ['Rich Gannon', 'Raiders', '2000s', 'QB', 91, '13,217 pass yds · 87 TD · 34 INT', 'Led the NFL in passing yards, 2002'],
+  ['Roy Williams', 'Lions', '2000s', 'WR', 82, '318 rec · 4,676 yds · 37 TD', 'Top 3 in receiving yards, 2006'],
+  ['Braylon Edwards', 'Browns', '2000s', 'WR', 81, '272 rec · 4,237 yds · 32 TD', 'Top 10 in receiving yards, 2007'],
+  ['Victor Cruz', 'Giants', '2010s', 'WR', 85, '303 rec · 4,549 yds · 25 TD', 'Top 3 in receiving yards, 2011'],
+  ['Brandon Marshall', 'Jets', '2010s', 'WR', 87, '625 rec · 8,178 yds · 58 TD', 'Top 3 in receiving yards, 2012'],
+  ['LeSean McCoy', 'Bills', '2010s', 'RB', 85, '10,434 rush yds · 69 TD · 463 rec', 'Led the NFL in rushing yards, 2013'],
+  ['Muhammad Wilkerson', 'Jets', '2010s', 'DEF', 86, 'DE · 44.5 sacks with Jets · 2015 Pro Bowl', ''],
+  ['Cameron Jordan', 'Saints', '2020s', 'DEF', 96, 'DE · franchise-record 132 career sacks · 8x Pro Bowl', ''],
 ];
 
 export const PLAYERS: Player[] = RAW.map(([name, team, era, pos, ovr, stats, accolades], id) => ({

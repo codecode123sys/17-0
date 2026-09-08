@@ -38,12 +38,17 @@ export function Draft({ game }: { game: GameController }) {
   const open = openSlots(filled);
   const pickingNote = open.length === 1 ? `Last slot: ${open[0].label}` : "Fill any open slot";
 
-  const cards = roundPlayers(spin.era, spin.team).slice().sort((a, b) => {
-    const ao = targetsFor(a, filled).length > 0 ? 1 : 0;
-    const bo = targetsFor(b, filled).length > 0 ? 1 : 0;
-    if (ao !== bo) return bo - ao;
-    return b.ovr - a.ovr;
-  });
+  const cards = roundPlayers(spin.era, spin.team)
+    .slice()
+    .sort((a, b) => {
+      const ao = targetsFor(a, filled).length > 0 ? 1 : 0;
+      const bo = targetsFor(b, filled).length > 0 ? 1 : 0;
+      if (ao !== bo) return bo - ao;
+      // Sorting by ovr here would give away the best pick by position even
+      // in Blind mode, where the rating itself is hidden — alphabetical
+      // keeps the ordering uninformative when it needs to be.
+      return mode === "blind" ? a.name.localeCompare(b.name) : b.ovr - a.ovr;
+    });
 
   // Deliberately the broad "every team in this era" pool, not the narrower
   // draftable-only set — this is only for decoy variety while the reel

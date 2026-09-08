@@ -138,13 +138,10 @@ function doPost(e) {
   return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
 }
 
-// Public, read-only leaderboard query: /exec?period=day|week|month|year
+// Public, read-only leaderboard query:
+//   /exec?period=day|week|month|year  -> top runs in that window
+//   /exec?checkName=SomeName          -> { ok: true, taken: true|false }
 function doGet(e) {
-  var period = ((e.parameter && e.parameter.period) || "week").toLowerCase();
-  var now = new Date();
-  var ms = { day: 1, week: 7, month: 30, year: 365 }[period];
-  var cutoff = ms ? new Date(now.getTime() - ms * 24 * 60 * 60 * 1000) : new Date(0);
-
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   var values = sheet.getDataRange().getValues();
   var headers = values[0];
@@ -152,6 +149,21 @@ function doGet(e) {
   headers.forEach(function (h, i) {
     idx[h] = i;
   });
+
+  if (e.parameter && e.parameter.checkName) {
+    var wanted = e.parameter.checkName.trim().toLowerCase();
+    var taken = values.slice(1).some(function (r) {
+      return String(r[idx.name] || "").trim().toLowerCase() === wanted;
+    });
+    return ContentService.createTextOutput(JSON.stringify({ ok: true, taken: taken })).setMimeType(
+      ContentService.MimeType.JSON
+    );
+  }
+
+  var period = ((e.parameter && e.parameter.period) || "week").toLowerCase();
+  var now = new Date();
+  var ms = { day: 1, week: 7, month: 30, year: 365 }[period];
+  var cutoff = ms ? new Date(now.getTime() - ms * 24 * 60 * 60 * 1000) : new Date(0);
 
   var entries = values
     .slice(1)
@@ -193,13 +205,18 @@ function doGet(e) {
 Download the collected data as a real `.xlsx` anytime from the sheet:
 **File → Download → Microsoft Excel (.xlsx)**.
 
-Name filtering (min length, profanity blocklist) happens client-side in
-`src/lib/profanity.ts` before a name is saved — someone could still bypass
-it by hand-crafting a request directly to the webhook URL, since the
+Name filtering (min length, profanity blocklist) and the one-name-per-
+player uniqueness check both happen client-side only — `profanity.ts`
+validates the name, and `leaderboard.ts`'s `checkNameTaken` calls the
+`checkName` query above before saving. Neither is enforced by `doPost`
+itself: there's no account system, so the server has no real way to tell
+"the legitimate owner of this name resubmitting" apart from "someone else
+claiming an already-used name" — the uniqueness check only stops someone
+from *picking* an already-used name through the game's own UI, not from
+bypassing it entirely with a hand-crafted request to the webhook (the
 shared key is visible in the bundled client JS same as the rest of this
-setup. There's no server-side re-validation of the name in the Apps
-Script above; add one there (mirroring `profanity.ts`'s logic) if that
-matters for your deployment.
+setup). Good enough to keep the leaderboard honest for normal play; not a
+real security boundary.
 
 ## Run history
 

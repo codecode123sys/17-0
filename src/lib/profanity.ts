@@ -23,7 +23,7 @@ const BLOCKED_SUBSTRINGS = [
   "nazi",
 ];
 
-const MIN_LENGTH = 2;
+const MIN_LENGTH = 1;
 const MAX_LENGTH = 16;
 
 /** Validates a leaderboard display name. Returns an error message if it's

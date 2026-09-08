@@ -36,3 +36,20 @@ export async function fetchLeaderboard(period: LeaderboardPeriod): Promise<Leade
     return [];
   }
 }
+
+/** Whether a leaderboard name is already taken by someone else (case-
+ * insensitive — see the Apps Script's `doGet` `checkName` branch). Fails
+ * open (returns false, i.e. "not taken") on any error or when the webhook
+ * isn't configured, so a broken check never blocks someone from playing —
+ * it only ever adds friction, never breaks the game. */
+export async function checkNameTaken(name: string): Promise<boolean> {
+  if (!WEBHOOK_URL) return false;
+  try {
+    const res = await fetch(`${WEBHOOK_URL}?checkName=${encodeURIComponent(name)}`);
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data.taken === true;
+  } catch {
+    return false;
+  }
+}

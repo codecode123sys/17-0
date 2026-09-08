@@ -78,6 +78,10 @@ export function useGame() {
   const [eraSpinToken, setEraSpinToken] = useState(0);
   const [respinTeamLeft, setRespinTeamLeft] = useState(RESPIN_START);
   const [respinEraLeft, setRespinEraLeft] = useState(RESPIN_START);
+  // The era an era-swap just left, so a second swap in a row can't bounce
+  // straight back to it. Reset on every fresh spin (a new round) since the
+  // constraint is only meant to span consecutive swaps within one pick.
+  const lastEraRef = useRef<Era | null>(null);
 
   // season
   const [season, setSeason] = useState<SeasonState | null>(null);
@@ -105,6 +109,7 @@ export function useGame() {
     setSpin(next);
     setTeamSpinToken((t) => t + 1);
     setEraSpinToken((t) => t + 1);
+    lastEraRef.current = null;
   }, []);
 
   const applyTargetedSpin = useCallback((next: DraftSpin, prev: DraftSpin) => {
@@ -157,8 +162,9 @@ export function useGame() {
 
   const respinEra = useCallback(() => {
     if (!spin || respinEraLeft <= 0) return;
-    const next = pickEraSwap(usedEras, spin.era, spin.team, filled);
+    const next = pickEraSwap(usedEras, spin.era, spin.team, filled, lastEraRef.current);
     if (!next) return;
+    lastEraRef.current = spin.era; // remember what we just left
     applyTargetedSpin(next, spin);
     setRespinEraLeft((n) => n - 1);
   }, [spin, usedEras, filled, respinEraLeft, applyTargetedSpin]);

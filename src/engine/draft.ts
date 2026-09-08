@@ -125,16 +125,25 @@ export function respinTeam(era: Era, curTeam: string, filled: FilledSlots, rand:
 }
 
 /** Era swap: strongly prefers a decade where the current franchise can still
- *  be drafted, so the swap keeps your team; only re-rolls the team if it can't. */
+ *  be drafted, so the swap keeps your team; only re-rolls the team if it can't.
+ *  `avoidEra` (the era this swap is leaving, tracked by the caller across
+ *  consecutive swaps) is excluded too when there's another option, so two
+ *  swaps in a row can't just bounce back and forth between the same two
+ *  eras — it's dropped as a constraint the moment it would leave no choices
+ *  at all. */
 export function respinEra(
   usedEras: Era[],
   curEra: Era,
   curTeam: string,
   filled: FilledSlots,
+  avoidEra?: Era | null,
   rand: () => number = Math.random
 ): { era: Era; team: string } | null {
-  const pool = ERAS.filter((e) => e !== curEra && eraCount(usedEras, e) < ERA_CAP);
-  if (!pool.length) return null;
+  const base = ERAS.filter((e) => e !== curEra && eraCount(usedEras, e) < ERA_CAP);
+  if (!base.length) return null;
+
+  const withoutBounceBack = avoidEra ? base.filter((e) => e !== avoidEra) : base;
+  const pool = withoutBounceBack.length ? withoutBounceBack : base;
 
   const keep = pool.filter((e) => teamDraftableInEra(curTeam, e, filled));
   const fresh = pool.filter((e) => eraCount(usedEras, e) === 0);

@@ -142,63 +142,71 @@ function doPost(e) {
 //   /exec?period=day|week|month|year  -> top runs in that window
 //   /exec?checkName=SomeName          -> { ok: true, taken: true|false }
 function doGet(e) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var values = sheet.getDataRange().getValues();
-  var headers = values[0];
-  var idx = {};
-  headers.forEach(function (h, i) {
-    idx[h] = i;
-  });
-
-  if (e.parameter && e.parameter.checkName) {
-    var wanted = e.parameter.checkName.trim().toLowerCase();
-    var taken = values.slice(1).some(function (r) {
-      return String(r[idx.name] || "").trim().toLowerCase() === wanted;
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var values = sheet.getDataRange().getValues();
+    var headers = values[0];
+    var idx = {};
+    headers.forEach(function (h, i) {
+      idx[h] = i;
     });
-    return ContentService.createTextOutput(JSON.stringify({ ok: true, taken: taken })).setMimeType(
+
+    if (e.parameter && e.parameter.checkName) {
+      var wanted = e.parameter.checkName.trim().toLowerCase();
+      var taken = values.slice(1).some(function (r) {
+        return String(r[idx.name] || "").trim().toLowerCase() === wanted;
+      });
+      return ContentService.createTextOutput(JSON.stringify({ ok: true, taken: taken })).setMimeType(
+        ContentService.MimeType.JSON
+      );
+    }
+
+    var period = ((e.parameter && e.parameter.period) || "week").toLowerCase();
+    var now = new Date();
+    var ms = { day: 1, week: 7, month: 30, year: 365 }[period];
+    var cutoff = ms ? new Date(now.getTime() - ms * 24 * 60 * 60 * 1000) : new Date(0);
+
+    var entries = values
+      .slice(1)
+      .filter(function (r) {
+        return r[idx.timestamp] instanceof Date && r[idx.timestamp] >= cutoff;
+      })
+      .map(function (r) {
+        var players = {};
+        SLOTS.forEach(function (s) {
+          players[s] = {
+            name: r[idx[s + "_name"]],
+            team: r[idx[s + "_team"]],
+            era: r[idx[s + "_era"]],
+            ovr: r[idx[s + "_ovr"]],
+          };
+        });
+        return {
+          name: r[idx.name] || "Anonymous",
+          wins: r[idx.wins],
+          losses: r[idx.losses],
+          strength: r[idx.strength],
+          result: r[idx.result],
+          outcome: r[idx.outcome],
+          timestamp: r[idx.timestamp].toISOString(),
+          players: players,
+        };
+      })
+      .sort(function (a, b) {
+        return b.wins - a.wins || b.strength - a.strength;
+      })
+      .slice(0, 25);
+
+    return ContentService.createTextOutput(JSON.stringify({ ok: true, entries: entries })).setMimeType(
       ContentService.MimeType.JSON
     );
+  } catch (err) {
+    // Surface the real error in the response body instead of just a bare
+    // "Failed" in the Executions log with no visible detail.
+    return ContentService.createTextOutput(
+      JSON.stringify({ ok: false, error: String(err), stack: err.stack })
+    ).setMimeType(ContentService.MimeType.JSON);
   }
-
-  var period = ((e.parameter && e.parameter.period) || "week").toLowerCase();
-  var now = new Date();
-  var ms = { day: 1, week: 7, month: 30, year: 365 }[period];
-  var cutoff = ms ? new Date(now.getTime() - ms * 24 * 60 * 60 * 1000) : new Date(0);
-
-  var entries = values
-    .slice(1)
-    .filter(function (r) {
-      return r[idx.timestamp] instanceof Date && r[idx.timestamp] >= cutoff;
-    })
-    .map(function (r) {
-      var players = {};
-      SLOTS.forEach(function (s) {
-        players[s] = {
-          name: r[idx[s + "_name"]],
-          team: r[idx[s + "_team"]],
-          era: r[idx[s + "_era"]],
-          ovr: r[idx[s + "_ovr"]],
-        };
-      });
-      return {
-        name: r[idx.name] || "Anonymous",
-        wins: r[idx.wins],
-        losses: r[idx.losses],
-        strength: r[idx.strength],
-        result: r[idx.result],
-        outcome: r[idx.outcome],
-        timestamp: r[idx.timestamp].toISOString(),
-        players: players,
-      };
-    })
-    .sort(function (a, b) {
-      return b.wins - a.wins || b.strength - a.strength;
-    })
-    .slice(0, 25);
-
-  return ContentService.createTextOutput(JSON.stringify({ ok: true, entries: entries })).setMimeType(
-    ContentService.MimeType.JSON
-  );
 }
 ```
 

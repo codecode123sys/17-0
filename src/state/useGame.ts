@@ -17,7 +17,7 @@ import { logSeasonResult } from "../lib/logSeason";
 import { loadRuns, saveRun } from "../lib/runs";
 import type { Run } from "../lib/runs";
 
-export type Screen = "title" | "draft" | "season" | "results" | "history";
+export type Screen = "title" | "draft" | "season" | "results" | "history" | "leaderboard";
 export type Mode = "classic" | "blind";
 
 const RESPIN_START = 3;
@@ -231,6 +231,8 @@ export function useGame() {
     setScreen("history");
   }, []);
 
+  const viewLeaderboard = useCallback(() => setScreen("leaderboard"), []);
+
   const draftAgain = startDraft;
 
   return {
@@ -265,6 +267,7 @@ export function useGame() {
     // run history
     runs,
     viewHistory,
+    viewLeaderboard,
   };
 }
 

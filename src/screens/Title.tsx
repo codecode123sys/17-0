@@ -1,7 +1,7 @@
 import type { GameController } from "../state/useGame";
 
 export function Title({ game }: { game: GameController }) {
-  const { mode, setMode, startDraft, best, viewHistory } = game;
+  const { mode, setMode, startDraft, best, viewHistory, viewLeaderboard } = game;
 
   return (
     <section className="view">
@@ -37,11 +37,16 @@ export function Title({ game }: { game: GameController }) {
         <button className="btn" onClick={startDraft}>
           Start the draft
         </button>
-        {!!best?.plays && (
-          <button className="btn ghost small" onClick={viewHistory}>
-            My runs
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn ghost small" onClick={viewLeaderboard}>
+            Leaderboard
           </button>
-        )}
+          {!!best?.plays && (
+            <button className="btn ghost small" onClick={viewHistory}>
+              My runs
+            </button>
+          )}
+        </div>
       </div>
 
       {best && (

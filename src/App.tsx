@@ -5,6 +5,7 @@ import { Draft } from "./screens/Draft";
 import { Season } from "./screens/Season";
 import { Results } from "./screens/Results";
 import { History } from "./screens/History";
+import { Leaderboard } from "./screens/Leaderboard";
 
 export default function App() {
   const game = useGame();
@@ -22,6 +23,7 @@ export default function App() {
       {game.screen === "season" && <Season game={game} />}
       {game.screen === "results" && <Results game={game} />}
       {game.screen === "history" && <History game={game} />}
+      {game.screen === "leaderboard" && <Leaderboard game={game} />}
     </div>
   );
 }

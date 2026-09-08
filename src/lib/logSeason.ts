@@ -2,6 +2,7 @@ import { SLOTS } from "../engine/draft";
 import type { FilledSlots } from "../engine/draft";
 import type { SeasonState } from "../engine/season";
 import { summarizeSeason } from "../engine/season";
+import { getPlayerName } from "./playerName";
 
 const WEBHOOK_URL = import.meta.env.VITE_SHEET_WEBHOOK_URL;
 const WEBHOOK_KEY = import.meta.env.VITE_SHEET_WEBHOOK_KEY;
@@ -9,7 +10,10 @@ const WEBHOOK_KEY = import.meta.env.VITE_SHEET_WEBHOOK_KEY;
 /** Best-effort, fire-and-forget log of one completed season to a Google
  * Sheet (via an Apps Script Web App — see scripts/README.md). No-ops
  * silently if the webhook isn't configured, and never throws — this is
- * telemetry, not something that should ever be able to break the game. */
+ * telemetry, not something that should ever be able to break the game.
+ * Includes the player's chosen display name (see playerName.ts, "Anonymous"
+ * if never set) so the same sheet can double as the leaderboard's data
+ * source — see leaderboard.ts and the Apps Script's `doGet` handler. */
 export function logSeasonResult(season: SeasonState, filled: FilledSlots): void {
   if (!WEBHOOK_URL || !WEBHOOK_KEY) return;
 
@@ -22,6 +26,7 @@ export function logSeasonResult(season: SeasonState, filled: FilledSlots): void 
 
   const payload = {
     key: WEBHOOK_KEY,
+    name: getPlayerName() || "Anonymous",
     strength: season.strength,
     wins: season.wins,
     losses: season.losses,

@@ -67,28 +67,41 @@ You can skip the download/re-upload step by publishing the sheet instead:
 values (.csv)," and pass that URL straight to
 `import_players_csv.py <url>` any time you've made edits.
 
-## Season logging (optional)
+## Season logging + leaderboard (optional)
 
 Every completed season — the 8 drafted players, final record, playoff
-outcome, roster strength, and a timestamp — can be logged as one row to a
-Google Sheet, across every visitor, as a running dataset. Nothing personal
-is sent; it's pure gameplay data. This is entirely optional: with no
-webhook configured, `src/lib/logSeason.ts` no-ops silently.
+outcome, roster strength, a timestamp, and the player's chosen display
+name (`src/lib/playerName.ts`, "Anonymous" if never set) — is logged as
+one row to a Google Sheet, across every visitor, as a running dataset.
+This same sheet doubles as the leaderboard's data source: the in-game
+"Leaderboard" screen queries it for the top runs in the last day/week/
+month/year. Nothing sensitive is sent; it's pure gameplay data plus
+whatever name the player typed in. Entirely optional: with no webhook
+configured, `src/lib/logSeason.ts` no-ops silently and the leaderboard
+screen just shows an empty state.
 
 Setup:
 
 1. Create a blank Google Sheet. **Extensions → Apps Script**, paste in the
    script below, and run `setupHeaders` once from the editor (approve the
-   permission prompt — it's your own script touching your own sheet).
+   permission prompt — it's your own script touching your own sheet). If
+   you already had the older version of this script set up (no
+   leaderboard), it's safe to re-run `setupHeaders` — the new `name`
+   column is appended at the end, so existing rows/columns don't shift.
 2. **Deploy → New deployment → Web app.** Execute as "Me," access "Anyone."
-   Copy the resulting URL (ends in `/exec`).
+   Copy the resulting URL (ends in `/exec`). If you're updating an
+   existing deployment, use **Manage deployments → edit (pencil) → New
+   version** instead of creating a second deployment, so the URL you
+   already have configured keeps working.
 3. Copy `.env.example` to `.env.local`, and set `VITE_SHEET_WEBHOOK_URL` to
    that URL and `VITE_SHEET_WEBHOOK_KEY` to a random string of your choice
    (it just has to match the `SHARED_KEY` constant in the script below —
    this isn't real auth, just enough to stop randos from spamming the
    endpoint if they ever found the URL). Set the same two values in
    Vercel's **Project Settings → Environment Variables** for production,
-   then redeploy.
+   then redeploy. The leaderboard's read endpoint (`doGet`) is
+   intentionally public/unauthenticated — it only ever returns data, never
+   writes any — so no key is needed to view it.
 
 ```javascript
 var SHARED_KEY = "REPLACE_WITH_YOUR_OWN_RANDOM_STRING";
@@ -101,6 +114,7 @@ function setupHeaders() {
   SLOTS.forEach(function (s) {
     headers.push(s + "_name", s + "_team", s + "_era", s + "_ovr");
   });
+  headers.push("name"); // appended last so re-running this never shifts existing columns
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   sheet.setFrozenRows(1);
 }
@@ -118,14 +132,74 @@ function doPost(e) {
     var p = (data.players && data.players[s]) || {};
     row.push(p.name || "", p.team || "", p.era || "", p.ovr || "");
   });
+  row.push(data.name || "Anonymous");
   sheet.appendRow(row);
 
   return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
+}
+
+// Public, read-only leaderboard query: /exec?period=day|week|month|year
+function doGet(e) {
+  var period = ((e.parameter && e.parameter.period) || "week").toLowerCase();
+  var now = new Date();
+  var ms = { day: 1, week: 7, month: 30, year: 365 }[period];
+  var cutoff = ms ? new Date(now.getTime() - ms * 24 * 60 * 60 * 1000) : new Date(0);
+
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var idx = {};
+  headers.forEach(function (h, i) {
+    idx[h] = i;
+  });
+
+  var entries = values
+    .slice(1)
+    .filter(function (r) {
+      return r[idx.timestamp] instanceof Date && r[idx.timestamp] >= cutoff;
+    })
+    .map(function (r) {
+      var players = {};
+      SLOTS.forEach(function (s) {
+        players[s] = {
+          name: r[idx[s + "_name"]],
+          team: r[idx[s + "_team"]],
+          era: r[idx[s + "_era"]],
+          ovr: r[idx[s + "_ovr"]],
+        };
+      });
+      return {
+        name: r[idx.name] || "Anonymous",
+        wins: r[idx.wins],
+        losses: r[idx.losses],
+        strength: r[idx.strength],
+        result: r[idx.result],
+        outcome: r[idx.outcome],
+        timestamp: r[idx.timestamp].toISOString(),
+        players: players,
+      };
+    })
+    .sort(function (a, b) {
+      return b.wins - a.wins || b.strength - a.strength;
+    })
+    .slice(0, 25);
+
+  return ContentService.createTextOutput(JSON.stringify({ ok: true, entries: entries })).setMimeType(
+    ContentService.MimeType.JSON
+  );
 }
 ```
 
 Download the collected data as a real `.xlsx` anytime from the sheet:
 **File → Download → Microsoft Excel (.xlsx)**.
+
+Name filtering (min length, profanity blocklist) happens client-side in
+`src/lib/profanity.ts` before a name is saved — someone could still bypass
+it by hand-crafting a request directly to the webhook URL, since the
+shared key is visible in the bundled client JS same as the rest of this
+setup. There's no server-side re-validation of the name in the Apps
+Script above; add one there (mirroring `profanity.ts`'s logic) if that
+matters for your deployment.
 
 ## Run history
 

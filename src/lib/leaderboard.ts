@@ -20,20 +20,31 @@ export interface LeaderboardEntry {
   players: Record<string, LeaderboardPlayer>;
 }
 
-/** Top runs for the given time window, most-wins first (see the Apps
- * Script's `doGet` handler for the actual ranking/filter logic — this is
- * the same Google Sheet the anonymous season log writes to). Returns an
- * empty array on any failure, including the webhook not being configured;
- * a broken leaderboard should never be a broken game. */
-export async function fetchLeaderboard(period: LeaderboardPeriod): Promise<LeaderboardEntry[]> {
-  if (!WEBHOOK_URL) return [];
+export interface LeaderboardResult {
+  entries: LeaderboardEntry[];
+  totalPlaythroughs: number;
+}
+
+const EMPTY_RESULT: LeaderboardResult = { entries: [], totalPlaythroughs: 0 };
+
+/** Top runs for the given time window, most-wins first, plus the total
+ * count of every playthrough in that window (not just the ones shown —
+ * see the Apps Script's `doGet` handler for the actual ranking/filter/
+ * count logic, the same Google Sheet the anonymous season log writes to).
+ * Returns an empty result on any failure, including the webhook not being
+ * configured; a broken leaderboard should never be a broken game. */
+export async function fetchLeaderboard(period: LeaderboardPeriod): Promise<LeaderboardResult> {
+  if (!WEBHOOK_URL) return EMPTY_RESULT;
   try {
     const res = await fetch(`${WEBHOOK_URL}?period=${period}`);
-    if (!res.ok) return [];
+    if (!res.ok) return EMPTY_RESULT;
     const data = await res.json();
-    return Array.isArray(data.entries) ? data.entries : [];
+    return {
+      entries: Array.isArray(data.entries) ? data.entries : [],
+      totalPlaythroughs: typeof data.totalPlaythroughs === "number" ? data.totalPlaythroughs : 0,
+    };
   } catch {
-    return [];
+    return EMPTY_RESULT;
   }
 }
 

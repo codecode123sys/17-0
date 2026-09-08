@@ -176,11 +176,12 @@ function doGet(e) {
     var cutoff = ms ? new Date(now.getTime() - ms * 24 * 60 * 60 * 1000) : new Date(0);
     var limit = { day: 25, week: 25, month: 50, year: 100 }[period] || 25;
 
-    var entries = values
-      .slice(1)
-      .filter(function (r) {
-        return r[idx.timestamp] instanceof Date && r[idx.timestamp] >= cutoff;
-      })
+    var inWindow = values.slice(1).filter(function (r) {
+      return r[idx.timestamp] instanceof Date && r[idx.timestamp] >= cutoff;
+    });
+    var totalPlaythroughs = inWindow.length;
+
+    var entries = inWindow
       .map(function (r) {
         var players = {};
         SLOTS.forEach(function (s) {
@@ -211,6 +212,7 @@ function doGet(e) {
       JSON.stringify({
         ok: true,
         entries: entries,
+        totalPlaythroughs: totalPlaythroughs,
         debugSheetName: sheet.getName(),
         debugTotalRows: values.length - 1,
       })

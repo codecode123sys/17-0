@@ -14,10 +14,18 @@ const PERIODS: { key: LeaderboardPeriod; label: string }[] = [
   { key: "year", label: "Year" },
 ];
 
+const PERIOD_PHRASE: Record<LeaderboardPeriod, string> = {
+  day: "today",
+  week: "this week",
+  month: "this month",
+  year: "this year",
+};
+
 export function Leaderboard({ game }: { game: GameController }) {
   const { goHome } = game;
   const [period, setPeriod] = useState<LeaderboardPeriod>("week");
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [totalPlaythroughs, setTotalPlaythroughs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [nameInput, setNameInput] = useState(getPlayerName() ?? "");
   const [nameError, setNameError] = useState("");
@@ -29,7 +37,8 @@ export function Leaderboard({ game }: { game: GameController }) {
     setLoading(true);
     fetchLeaderboard(period).then((data) => {
       if (!cancelled) {
-        setEntries(data);
+        setEntries(data.entries);
+        setTotalPlaythroughs(data.totalPlaythroughs);
         setLoading(false);
       }
     });
@@ -99,6 +108,13 @@ export function Leaderboard({ game }: { game: GameController }) {
           </button>
         ))}
       </div>
+
+      {!loading && (
+        <p className="mode-note">
+          <strong className="mono">{totalPlaythroughs}</strong> playthrough{totalPlaythroughs === 1 ? "" : "s"}{" "}
+          {PERIOD_PHRASE[period]}
+        </p>
+      )}
 
       {loading && <p className="mode-note">Loading…</p>}
       {!loading && entries.length === 0 && (

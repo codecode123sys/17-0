@@ -172,8 +172,15 @@ function doGet(e) {
 
     var period = ((e.parameter && e.parameter.period) || "week").toLowerCase();
     var now = new Date();
-    var ms = { day: 1, week: 7, month: 30, year: 365 }[period];
-    var cutoff = ms ? new Date(now.getTime() - ms * 24 * 60 * 60 * 1000) : new Date(0);
+    var cutoff;
+    if (period === "day") {
+      // Calendar day (midnight today in the script's project time zone),
+      // not a rolling 24 hours -- see Project Settings for that time zone.
+      cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } else {
+      var ms = { week: 7, month: 30, year: 365 }[period];
+      cutoff = ms ? new Date(now.getTime() - ms * 24 * 60 * 60 * 1000) : new Date(0);
+    }
     var limit = { day: 25, week: 25, month: 50, year: 100 }[period] || 25;
 
     var inWindow = values.slice(1).filter(function (r) {

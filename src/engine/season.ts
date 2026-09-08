@@ -24,29 +24,29 @@ export function clampStr(v: number): number {
 // once it's already lost a game. Calibrated (via a Monte Carlo search
 // against this file's own game-probability model, /scripts equivalent) so
 // the resulting real chance of running the table follows a deliberately
-// simple, requested curve, currently: the original 85-anchored curve
-// (below 85 essentially impossible, 85-89 climbing to 2%, 90 jumping to
-// 8%, then +1 percentage point per additional strength point) shifted
-// down 1 percentage point everywhere and clamped at 0 -- real playtesting
-// (4 perfect seasons in ~40 runs) showed the original curve running hot.
-// That shift pushes the "first non-zero odds" point from 85 to 88 and the
-// big jump at 90 from 8% down to 7%, with the same +1%/point slope above
-// it. Re-run the calibration (see git history for the search script) if
-// the /6-or-/7 divisor or opponent baseline in gameWin/playGame ever
-// changes, since this table is only valid against the current model.
+// simple, requested curve: essentially impossible at/below 87, a linear
+// ramp from 0 at 87 to 2.5% at 89, then explicit anchors at 90 (5%) and
+// 91 (6%), continuing the same +1 percentage point per additional
+// strength point above that (matching 90->91's own slope). This flattens
+// the old jump at 90 (previously 7%) considerably while raising 89's odds
+// relative to the previous curve — a deliberate reshaping, not just
+// another flat shift. Re-run the calibration (see git history for the
+// search script) if the /6-or-/7 divisor or opponent baseline in
+// gameWin/playGame ever changes, since this table is only valid against
+// the current model.
 const PERFECT_RUN_BOOST: readonly [number, number][] = [
   [87, 87.0],
-  [88, 90.11],
-  [89, 91.34],
-  [90, 96.12],
-  [91, 96.53],
-  [92, 96.97],
-  [93, 97.28],
-  [94, 97.63],
-  [95, 97.97],
-  [96, 98.27],
-  [97, 98.58],
-  [97.74, 98.81],
+  [88, 91.84],
+  [89, 93.33],
+  [90, 95.14],
+  [91, 95.66],
+  [92, 96.12],
+  [93, 96.52],
+  [94, 96.91],
+  [95, 97.31],
+  [96, 97.63],
+  [97, 97.92],
+  [97.74, 98.24],
 ];
 
 /** The effective strength to use for a game in a season that hasn't lost

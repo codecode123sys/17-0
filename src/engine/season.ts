@@ -24,27 +24,29 @@ export function clampStr(v: number): number {
 // once it's already lost a game. Calibrated (via a Monte Carlo search
 // against this file's own game-probability model, /scripts equivalent) so
 // the resulting real chance of running the table follows a deliberately
-// simple, requested curve: below 85, essentially impossible; 85-89 climbs
-// from a sliver of a chance to 2%; at 90 it jumps to 8%, then rises exactly
-// 1 percentage point per additional strength point above 90. Re-run the
-// calibration (see git history for the search script) if the /6-or-/7
-// divisor or opponent baseline in gameWin/playGame ever changes, since this
-// table is only valid against the current model.
+// simple, requested curve, currently: the original 85-anchored curve
+// (below 85 essentially impossible, 85-89 climbing to 2%, 90 jumping to
+// 8%, then +1 percentage point per additional strength point) shifted
+// down 1 percentage point everywhere and clamped at 0 -- real playtesting
+// (4 perfect seasons in ~40 runs) showed the original curve running hot.
+// That shift pushes the "first non-zero odds" point from 85 to 88 and the
+// big jump at 90 from 8% down to 7%, with the same +1%/point slope above
+// it. Re-run the calibration (see git history for the search script) if
+// the /6-or-/7 divisor or opponent baseline in gameWin/playGame ever
+// changes, since this table is only valid against the current model.
 const PERFECT_RUN_BOOST: readonly [number, number][] = [
-  [85, 85.0],
-  [86, 90.11],
-  [87, 91.27],
-  [88, 92.21],
-  [89, 92.82],
-  [90, 96.53],
-  [91, 96.92],
-  [92, 97.28],
-  [93, 97.63],
-  [94, 97.97],
-  [95, 98.3],
-  [96, 98.57],
-  [97, 98.86],
-  [97.74, 99.08],
+  [87, 87.0],
+  [88, 90.11],
+  [89, 91.34],
+  [90, 96.12],
+  [91, 96.53],
+  [92, 96.97],
+  [93, 97.28],
+  [94, 97.63],
+  [95, 97.97],
+  [96, 98.27],
+  [97, 98.58],
+  [97.74, 98.81],
 ];
 
 /** The effective strength to use for a game in a season that hasn't lost

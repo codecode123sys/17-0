@@ -108,8 +108,17 @@ var SHARED_KEY = "REPLACE_WITH_YOUR_OWN_RANDOM_STRING";
 
 var SLOTS = ["qb", "rb1", "rb2", "wr1", "wr2", "te", "flex", "def"];
 
+// Always the sheet's first tab, regardless of whichever tab happens to be
+// "active" (last clicked) in the UI when this runs — getActiveSheet() can
+// silently point doPost and doGet at two different tabs if you ever switch
+// tabs while poking around the spreadsheet, which reads back as "nothing
+// on the leaderboard" with no error at all.
+function logSheet() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+}
+
 function setupHeaders() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var sheet = logSheet();
   var headers = ["timestamp", "strength", "wins", "losses", "seed", "divWinner", "division", "result", "outcome"];
   SLOTS.forEach(function (s) {
     headers.push(s + "_name", s + "_team", s + "_era", s + "_ovr");
@@ -126,7 +135,7 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var sheet = logSheet();
   var row = [new Date(), data.strength, data.wins, data.losses, data.seed, data.divWinner, data.division, data.result, data.outcome];
   SLOTS.forEach(function (s) {
     var p = (data.players && data.players[s]) || {};
@@ -143,7 +152,7 @@ function doPost(e) {
 //   /exec?checkName=SomeName          -> { ok: true, taken: true|false }
 function doGet(e) {
   try {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var sheet = logSheet();
     var values = sheet.getDataRange().getValues();
     var headers = values[0];
     var idx = {};
@@ -197,9 +206,14 @@ function doGet(e) {
       })
       .slice(0, 25);
 
-    return ContentService.createTextOutput(JSON.stringify({ ok: true, entries: entries })).setMimeType(
-      ContentService.MimeType.JSON
-    );
+    return ContentService.createTextOutput(
+      JSON.stringify({
+        ok: true,
+        entries: entries,
+        debugSheetName: sheet.getName(),
+        debugTotalRows: values.length - 1,
+      })
+    ).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     // Surface the real error in the response body instead of just a bare
     // "Failed" in the Executions log with no visible detail.

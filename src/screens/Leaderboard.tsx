@@ -120,19 +120,23 @@ export function Leaderboard({ game }: { game: GameController }) {
               <div className="run-date mono">{new Date(entry.timestamp).toLocaleDateString()}</div>
             </div>
           </div>
-          <div className="recap run-recap">
+          <div className="lb-roster">
             {SLOTS.map((s) => {
               const p = entry.players[s.key.toLowerCase()];
               if (!p) return null;
               return (
-                <div key={s.key} className="r">
-                  <div className="r-top">
-                    <PlayerPortrait player={p} />
-                    <div className="pos">{s.label}</div>
+                <div key={s.key} className="lb-player">
+                  <PlayerPortrait player={p} />
+                  <div className="lb-pos">{s.label}</div>
+                  <div className="lb-info">
+                    <div className="lb-name">{p.name}</div>
+                    <div className="lb-team">
+                      <TeamBadge team={p.team} />
+                      <span className="lb-team-name">{p.team}</span>
+                    </div>
                   </div>
-                  <div className="nm">{p.name}</div>
-                  <div className="mt">
-                    <TeamBadge team={p.team} /> {p.era} · OVR {p.ovr}
+                  <div className="lb-meta mono">
+                    {p.era} · OVR {p.ovr}
                   </div>
                 </div>
               );

@@ -395,7 +395,7 @@ const RAW: [string, string, Era, Position, number, string, string][] = [
   ['Santana Moss', 'Commanders', '2000s', 'WR', 80, '498 rec · 7,403 yds · 46 TD', 'Top 3 in receiving yards, 2005'],
   ['Donald Driver', 'Packers', '2000s', 'WR', 81, '643 rec · 9,012 yds · 48 TD', 'Top 10 in receiving yards, 2006'],
   ['Patrick Willis', '49ers', '2000s', 'DEF', 84, 'DROY \'07 · 5x 1st-team All-Pro', ''],
-  ['Darrelle Revis', 'Jets', '2000s', 'DEF', 84, 'Revis Island · shutdown corner', ''],
+  ['Darrelle Revis', 'Jets', '2000s', 'DEF', 95, 'Revis Island · shutdown corner', ''],
   ['Nnamdi Asomugha', 'Raiders', '2000s', 'DEF', 80, 'quarterbacks stopped throwing his way', ''],
   ['Kevin Williams', 'Vikings', '2000s', 'DEF', 80, 'Williams Wall DT · 5x All-Pro', ''],
   ['Lance Briggs', 'Bears', '2000s', 'DEF', 77, '7x Pro Bowl weak-side LB', ''],

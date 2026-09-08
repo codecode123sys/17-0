@@ -1,3 +1,4 @@
+import { NameForm } from "../components/NameForm";
 import type { GameController } from "../state/useGame";
 
 export function Title({ game }: { game: GameController }) {
@@ -48,6 +49,8 @@ export function Title({ game }: { game: GameController }) {
           )}
         </div>
       </div>
+
+      <NameForm />
 
       {best && (
         <p className="best">

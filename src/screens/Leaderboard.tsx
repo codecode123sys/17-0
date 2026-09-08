@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { SLOTS } from "../engine/draft";
-import { PlayerPortrait } from "../components/PlayerPortrait";
 import { TeamBadge } from "../components/TeamBadge";
 import { checkNameTaken, fetchLeaderboard } from "../lib/leaderboard";
 import type { LeaderboardEntry, LeaderboardPeriod } from "../lib/leaderboard";
@@ -125,19 +124,10 @@ export function Leaderboard({ game }: { game: GameController }) {
               const p = entry.players[s.key.toLowerCase()];
               if (!p) return null;
               return (
-                <div key={s.key} className="lb-player">
-                  <PlayerPortrait player={p} />
-                  <div className="lb-pos">{s.label}</div>
-                  <div className="lb-info">
-                    <div className="lb-name">{p.name}</div>
-                    <div className="lb-team">
-                      <TeamBadge team={p.team} />
-                      <span className="lb-team-name">{p.team}</span>
-                    </div>
-                  </div>
-                  <div className="lb-meta mono">
-                    {p.era} · OVR {p.ovr}
-                  </div>
+                <div key={s.key} className="lb-chip">
+                  <TeamBadge team={p.team} />
+                  <span className="lb-chip-pos">{s.label}</span>
+                  <span className="lb-chip-name">{p.name}</span>
                 </div>
               );
             })}

@@ -310,37 +310,32 @@
   .run-date { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .run-recap { margin-top: 12px; }
 
-  /* One full-width row per drafted player, used on the leaderboard —
-     roomier than the results/history card grid so the team name reads
-     clearly instead of being reduced to just the badge abbreviation. */
+  /* The drafted roster on a leaderboard entry — a compact, wrapping row of
+     small chips underneath the submitter/record/outcome header, not a full
+     card per player (that's what results/history's .recap grid is for). */
   .lb-roster {
-    margin-top: 12px;
+    margin-top: 10px;
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    gap: 6px;
   }
-  .lb-player {
-    display: flex;
+  .lb-chip {
+    display: inline-flex;
     align-items: center;
-    gap: 12px;
-    padding: 9px 0;
-    border-top: 1px solid var(--line);
+    gap: 5px;
+    padding: 4px 8px 4px 6px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
   }
-  .lb-player:first-child { border-top: none; }
-  .lb-pos {
-    flex: none;
-    width: 34px;
+  .lb-chip-pos {
     font-family: "Oswald", sans-serif;
     font-weight: 700;
-    font-size: 11px;
+    font-size: 9.5px;
     color: var(--accent-strong);
-    letter-spacing: .06em;
-    text-align: center;
+    letter-spacing: .04em;
   }
-  .lb-info { flex: 1 1 auto; min-width: 0; }
-  .lb-name { font-family: "Oswald", sans-serif; font-weight: 500; font-size: 14px; line-height: 1.2; }
-  .lb-team { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
-  .lb-team-name { font-size: 12px; color: var(--muted); font-weight: 600; }
-  .lb-meta { flex: none; font-size: 11px; color: var(--muted); }
+  .lb-chip-name { font-size: 11.5px; color: var(--ink); }
 
   @media (max-width: 620px) {
     .history-layout { flex-direction: column; }

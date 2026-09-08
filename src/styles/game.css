@@ -310,6 +310,22 @@
   .run-date { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .run-recap { margin-top: 12px; }
 
+  .lb-strength {
+    margin-left: auto;
+    align-self: flex-start;
+    flex: none;
+    font-size: 13px;
+    color: var(--ink);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .lb-strength-label {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: .06em;
+  }
+
   /* The drafted roster on a leaderboard entry — a compact, wrapping row of
      small chips underneath the submitter/record/outcome header, not a full
      card per player (that's what results/history's .recap grid is for). */

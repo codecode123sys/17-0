@@ -118,6 +118,9 @@ export function Leaderboard({ game }: { game: GameController }) {
               </div>
               <div className="run-date mono">{new Date(entry.timestamp).toLocaleDateString()}</div>
             </div>
+            <div className="lb-strength mono">
+              <span className="lb-strength-label">STR</span> {entry.strength.toFixed(1)}
+            </div>
           </div>
           <div className="lb-roster">
             {SLOTS.map((s) => {

@@ -341,7 +341,7 @@ function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-const DRIVE_DELAY_MS = 550;
+const DRIVE_DELAY_MS = 1400;
 const DRIVE_LOG_SIZE = 6;
 
 function GameReveal({

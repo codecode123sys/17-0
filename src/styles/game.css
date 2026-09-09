@@ -664,6 +664,15 @@
     color: var(--muted);
   }
 
+  .tile-btn {
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .tile-btn.active { border-color: var(--accent-strong); box-shadow: var(--shadow); }
+  .tile-btn.locked { cursor: default; }
+
   .roster {
     margin-top: 26px;
     border-top: 1px solid var(--line);

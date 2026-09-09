@@ -9,7 +9,8 @@ const TAPS_TO_REVEAL = 7;
 const TAP_WINDOW_MS = 3000;
 
 export function Title({ game }: { game: GameController }) {
-  const { mode, setMode, startDraft, best, viewHistory, viewLeaderboard, devMode, tryDevCode } = game;
+  const { mode, setMode, startDraft, best, viewHistory, viewLeaderboard, devMode, tryDevCode, startDailyChallenge } =
+    game;
   const [showCodeEntry, setShowCodeEntry] = useState(false);
   const [code, setCode] = useState("");
   const tapCountRef = useRef(0);
@@ -80,6 +81,9 @@ export function Title({ game }: { game: GameController }) {
         </p>
         <button className="btn" onClick={startDraft}>
           Start the draft
+        </button>
+        <button className="btn ghost" onClick={startDailyChallenge}>
+          Daily challenge
         </button>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn ghost small" onClick={viewLeaderboard}>

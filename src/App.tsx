@@ -2,6 +2,7 @@ import "./styles/game.css";
 import { useGame } from "./state/useGame";
 import { Title } from "./screens/Title";
 import { Draft } from "./screens/Draft";
+import { DailyDraft } from "./screens/DailyDraft";
 import { Season } from "./screens/Season";
 import { Results } from "./screens/Results";
 import { History } from "./screens/History";
@@ -20,6 +21,7 @@ export default function App() {
 
       {game.screen === "title" && <Title game={game} />}
       {game.screen === "draft" && <Draft game={game} />}
+      {game.screen === "dailyDraft" && <DailyDraft game={game} />}
       {game.screen === "season" && <Season game={game} />}
       {game.screen === "results" && <Results game={game} />}
       {game.screen === "history" && <History game={game} />}

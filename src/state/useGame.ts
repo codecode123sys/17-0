@@ -9,6 +9,8 @@ import {
   spinRound,
 } from "../engine/draft";
 import type { FilledSlots } from "../engine/draft";
+import { bestPossibleRoster, generateDailyBoard, todayKey } from "../engine/daily";
+import type { DailyTile } from "../engine/daily";
 import { simulate } from "../engine/projection";
 import type { Projection } from "../engine/projection";
 import { enterSeason, stepSeason, summarizeSeason } from "../engine/season";
@@ -17,7 +19,7 @@ import { logSeasonResult } from "../lib/logSeason";
 import { loadRuns, saveRun } from "../lib/runs";
 import type { Run } from "../lib/runs";
 
-export type Screen = "title" | "draft" | "season" | "results" | "history" | "leaderboard";
+export type Screen = "title" | "draft" | "dailyDraft" | "season" | "results" | "history" | "leaderboard";
 export type Mode = "classic" | "blind";
 
 const RESPIN_START = 2;
@@ -121,6 +123,15 @@ export function useGame() {
   // run history (local to this device — no account system)
   const [runs, setRuns] = useState<Run[]>([]);
 
+  // daily challenge — a fixed, date-seeded board of 8 tiles shared by every
+  // player that day. Always blind mode; no respins (there's nothing random
+  // left to reroll — see daily.ts's design comment).
+  const [dailyBoard, setDailyBoard] = useState<DailyTile[]>([]);
+  const [dailyUsedKeys, setDailyUsedKeys] = useState<string[]>([]);
+  const [dailySelectedKey, setDailySelectedKey] = useState<string | null>(null);
+  const [dailyBestRoster, setDailyBestRoster] = useState<FilledSlots | null>(null);
+  const [isDaily, setIsDaily] = useState(false);
+
   useEffect(() => {
     setBest(loadBest());
     setDevMode(loadDevMode());
@@ -168,6 +179,7 @@ export function useGame() {
     setProjection(null);
     setSeasonSummary(null);
     seasonCounted.current = false;
+    setIsDaily(false);
     setScreen("draft");
   }, [applyFreshSpin, devMode]);
 
@@ -188,6 +200,45 @@ export function useGame() {
       }
     },
     [filled, usedEras, spin, applyFreshSpin, devMode]
+  );
+
+  const startDailyChallenge = useCallback(() => {
+    const board = generateDailyBoard(todayKey());
+    setDailyBoard(board);
+    setDailyUsedKeys([]);
+    setDailySelectedKey(null);
+    setDailyBestRoster(bestPossibleRoster(board));
+    setFilled({});
+    setUsedEras([]);
+    setIsDaily(true);
+    setSeason(null);
+    setAutoplay(false);
+    setProjection(null);
+    setSeasonSummary(null);
+    seasonCounted.current = false;
+    setScreen("dailyDraft");
+  }, []);
+
+  const selectDailyTile = useCallback((key: string) => {
+    setDailySelectedKey((prev) => (prev === key ? null : key));
+  }, []);
+
+  const chooseDaily = useCallback(
+    (player: Player, slotKey: string) => {
+      if (!dailySelectedKey) return;
+      const nextFilled: FilledSlots = { ...filled, [slotKey]: player };
+      const nextUsedKeys = [...dailyUsedKeys, dailySelectedKey];
+      setFilled(nextFilled);
+      setDailyUsedKeys(nextUsedKeys);
+      setDailySelectedKey(null);
+
+      if (isDraftComplete(nextFilled)) {
+        const strength = rosterStrength(nextFilled);
+        setSeason(enterSeason(strength));
+        setScreen("season");
+      }
+    },
+    [filled, dailySelectedKey, dailyUsedKeys]
   );
 
   const respinTeam = useCallback(() => {
@@ -267,6 +318,7 @@ export function useGame() {
   const goHome = useCallback(() => {
     setAutoplay(false);
     setSeason(null);
+    setIsDaily(false);
     setScreen("title");
   }, []);
 
@@ -314,6 +366,15 @@ export function useGame() {
     runs,
     viewHistory,
     viewLeaderboard,
+    // daily challenge
+    isDaily,
+    dailyBoard,
+    dailyUsedKeys,
+    dailySelectedKey,
+    dailyBestRoster,
+    startDailyChallenge,
+    selectDailyTile,
+    chooseDaily,
   };
 }
 

@@ -8,12 +8,13 @@ import { PlayoffLadder } from "../components/PlayoffLadder";
 import type { GameController } from "../state/useGame";
 
 export function Results({ game }: { game: GameController }) {
-  const { filled, mode, projection, seasonSummary, draftAgain } = game;
+  const { filled, mode, projection, seasonSummary, draftAgain, isDaily, dailyBestRoster, goHome } = game;
   const [toast, setToast] = useState("");
   if (!projection || !seasonSummary) return null;
   const r = projection;
   const sum = seasonSummary;
   const perfect = sum.record === "17–0" || sum.result === 5;
+  const showRatings = mode === "classic" && !isDaily;
 
   async function copyResult() {
     const lines = ["17–0  —  my all-time NFL roster", ""];
@@ -101,19 +102,58 @@ export function Results({ game }: { game: GameController }) {
               <div className="nm">{p.name}</div>
               <div className="mt">
                 <TeamBadge team={p.team} /> {p.era}
-                {mode === "classic" && ` · OVR ${p.ovr}`}
+                {showRatings && ` · OVR ${p.ovr}`}
               </div>
-              {mode === "classic" && p.stats && <div className="mt">{p.stats}</div>}
-              {mode === "classic" && p.accolades && <div className="mt accolades">{p.accolades}</div>}
+              {showRatings && p.stats && <div className="mt">{p.stats}</div>}
+              {showRatings && p.accolades && <div className="mt accolades">{p.accolades}</div>}
             </div>
           );
         })}
       </div>
 
+      {isDaily && dailyBestRoster && (
+        <div className="panel-chart">
+          <h3>The best possible roster from today&rsquo;s board</h3>
+          <div className="recap">
+            {SLOTS.map((s) => {
+              const p = dailyBestRoster[s.key];
+              const yours = filled[s.key];
+              if (!p) return null;
+              const nailedIt = yours && yours.id === p.id;
+              return (
+                <div key={s.key} className="r">
+                  <div className="r-top">
+                    <PlayerPortrait player={p} />
+                    <div className="pos">{s.label}</div>
+                  </div>
+                  <div className="nm">
+                    {p.name}
+                    {nailedIt && " ✓"}
+                  </div>
+                  <div className="mt">
+                    <TeamBadge team={p.team} /> {p.era} &middot; OVR {p.ovr}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="chart-note">
+            {SLOTS.filter((s) => filled[s.key]?.id === dailyBestRoster[s.key]?.id).length} of {SLOTS.length} slots
+            matched the optimal roster.
+          </p>
+        </div>
+      )}
+
       <div className="result-actions">
-        <button className="btn" onClick={draftAgain}>
-          Draft again
-        </button>
+        {isDaily ? (
+          <button className="btn" onClick={goHome}>
+            Back to home
+          </button>
+        ) : (
+          <button className="btn" onClick={draftAgain}>
+            Draft again
+          </button>
+        )}
         <button className="btn ghost" onClick={copyResult}>
           Copy result
         </button>

@@ -1,19 +1,62 @@
+import { useRef, useState } from "react";
 import { NameForm } from "../components/NameForm";
 import type { GameController } from "../state/useGame";
 
+// Clicking the score 7 times within 3 seconds reveals a code prompt.
+// Nothing on screen hints this exists — no visible button, no cursor
+// change, no label — by design (see useGame.ts's DEV_CODE comment).
+const TAPS_TO_REVEAL = 7;
+const TAP_WINDOW_MS = 3000;
+
 export function Title({ game }: { game: GameController }) {
-  const { mode, setMode, startDraft, best, viewHistory, viewLeaderboard } = game;
+  const { mode, setMode, startDraft, best, viewHistory, viewLeaderboard, devMode, tryDevCode } = game;
+  const [showCodeEntry, setShowCodeEntry] = useState(false);
+  const [code, setCode] = useState("");
+  const tapCountRef = useRef(0);
+  const lastTapRef = useRef(0);
+
+  function onScoreTap() {
+    const now = Date.now();
+    tapCountRef.current = now - lastTapRef.current > TAP_WINDOW_MS ? 1 : tapCountRef.current + 1;
+    lastTapRef.current = now;
+    if (tapCountRef.current >= TAPS_TO_REVEAL) {
+      tapCountRef.current = 0;
+      setShowCodeEntry(true);
+    }
+  }
+
+  function submitCode(e: React.FormEvent) {
+    e.preventDefault();
+    tryDevCode(code);
+    setCode("");
+    setShowCodeEntry(false);
+  }
 
   return (
     <section className="view">
       <div className="board">
         <div className="eyebrow">The perfect season</div>
-        <div className="score">17&ndash;0</div>
+        <div className="score" onClick={onScoreTap}>
+          17&ndash;0
+        </div>
+        {showCodeEntry && (
+          <form className="dev-code-entry" onSubmit={submitCode}>
+            <input
+              type="password"
+              autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onBlur={() => setShowCodeEntry(false)}
+            />
+          </form>
+        )}
         <p className="lede">
           Draft an all-time NFL roster &mdash; eight players spread across the decades, an offense plus a defensive
           anchor &mdash; then find out if it can run the table.
         </p>
-        <div className="spec">18 WEEKS &middot; 17 GAMES &middot; ZERO LOSSES</div>
+        <div className="spec">
+          18 WEEKS &middot; 17 GAMES &middot; ZERO LOSSES{devMode && " · DEV MODE"}
+        </div>
       </div>
 
       <div className="controls">

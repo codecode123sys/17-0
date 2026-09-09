@@ -61,9 +61,22 @@ export function roundPlayers(era: Era, team: string): Player[] {
   return PLAYERS.filter((p) => p.era === era && p.team === team);
 }
 
+/** The highest ovr among this team/era's still-draftable players (0 if none). */
+function bestDraftableOvr(team: string, era: Era, filled: FilledSlots): number {
+  let best = 0;
+  for (const p of PLAYERS) {
+    if (p.team === team && p.era === era && p.ovr > best && targetsFor(p, filled).length > 0) best = p.ovr;
+  }
+  return best;
+}
+
 /** Franchises with at least one still-draftable player in this era, preferring
- *  ones deep enough (>= MIN_BOARD total players) to make a rich board. */
-export function teamsForEra(era: Era, filled: FilledSlots): string[] {
+ *  ones deep enough (>= MIN_BOARD total players) to make a rich board.
+ *  `minOvr` (dev-mode only — see useGame.ts) narrows this further to
+ *  franchises whose best still-draftable player meets that bar, silently
+ *  dropped if that would leave nothing to pick from (late in a draft, high
+ *  picks run out — this should never be able to freeze the draft). */
+export function teamsForEra(era: Era, filled: FilledSlots, minOvr = 0): string[] {
   const total = new Map<string, number>();
   const draftable = new Set<string>();
   for (const p of PLAYERS) {
@@ -71,7 +84,11 @@ export function teamsForEra(era: Era, filled: FilledSlots): string[] {
     total.set(p.team, (total.get(p.team) ?? 0) + 1);
     if (targetsFor(p, filled).length > 0) draftable.add(p.team);
   }
-  const base = [...draftable];
+  let base = [...draftable];
+  if (minOvr > 0) {
+    const qualifying = base.filter((t) => bestDraftableOvr(t, era, filled) >= minOvr);
+    if (qualifying.length) base = qualifying;
+  }
   const deep = base.filter((t) => (total.get(t) ?? 0) >= MIN_BOARD);
   if (deep.length) return deep;
   const mid = base.filter((t) => (total.get(t) ?? 0) >= 2);
@@ -111,16 +128,28 @@ function pick<T>(arr: T[], rand: () => number = Math.random): T {
   return arr[Math.floor(rand() * arr.length)];
 }
 
-/** The reel's initial assignment for a fresh round. */
-export function spinRound(usedEras: Era[], filled: FilledSlots, rand: () => number = Math.random): { era: Era; team: string } {
+/** The reel's initial assignment for a fresh round. `minOvr` is dev-mode
+ *  only (see useGame.ts) — 0 means no constraint, the normal path. */
+export function spinRound(
+  usedEras: Era[],
+  filled: FilledSlots,
+  rand: () => number = Math.random,
+  minOvr = 0
+): { era: Era; team: string } {
   const era = pick(availableEras(usedEras), rand);
-  const team = pick(teamsForEra(era, filled), rand);
+  const team = pick(teamsForEra(era, filled, minOvr), rand);
   return { era, team };
 }
 
 /** Franchise swap: same era, a different team with a draftable player. */
-export function respinTeam(era: Era, curTeam: string, filled: FilledSlots, rand: () => number = Math.random): string | null {
-  const teams = teamsForEra(era, filled).filter((t) => t !== curTeam);
+export function respinTeam(
+  era: Era,
+  curTeam: string,
+  filled: FilledSlots,
+  rand: () => number = Math.random,
+  minOvr = 0
+): string | null {
+  const teams = teamsForEra(era, filled, minOvr).filter((t) => t !== curTeam);
   return teams.length ? pick(teams, rand) : null;
 }
 
@@ -137,7 +166,8 @@ export function respinEra(
   curTeam: string,
   filled: FilledSlots,
   avoidEra?: Era | null,
-  rand: () => number = Math.random
+  rand: () => number = Math.random,
+  minOvr = 0
 ): { era: Era; team: string } | null {
   const base = ERAS.filter((e) => e !== curEra && eraCount(usedEras, e) < ERA_CAP);
   if (!base.length) return null;
@@ -151,7 +181,9 @@ export function respinEra(
   const choices = keepFresh.length ? keepFresh : keep.length ? keep : fresh.length ? fresh : pool;
 
   const era = pick(choices, rand);
-  const team = teamDraftableInEra(curTeam, era, filled) ? curTeam : pick(teamsForEra(era, filled), rand);
+  const keepsBar = minOvr > 0 && bestDraftableOvr(curTeam, era, filled) < minOvr;
+  const team =
+    teamDraftableInEra(curTeam, era, filled) && !keepsBar ? curTeam : pick(teamsForEra(era, filled, minOvr), rand);
   return { era, team };
 }
 

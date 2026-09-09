@@ -165,6 +165,24 @@
     color: rgba(246, 245, 236, .55);
   }
 
+  /* Deliberately plain/unlabeled — see Title.tsx's tap-trigger comment. */
+  .dev-code-entry {
+    position: relative;
+    margin-top: 8px;
+    display: flex;
+    justify-content: center;
+  }
+  .dev-code-entry input {
+    width: 120px;
+    text-align: center;
+    border: 1px solid rgba(246, 245, 236, .3);
+    border-radius: var(--radius);
+    background: rgba(0, 0, 0, .2);
+    color: var(--chalk);
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+
   .controls {
     margin-top: 22px;
     display: flex;

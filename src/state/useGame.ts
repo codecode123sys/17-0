@@ -26,6 +26,31 @@ const STORAGE_KEY = "seventeen-oh-best";
 // before the next one plays.
 const AUTOPLAY_DELAY_MS = 900;
 
+// ---------- dev mode (hidden, code-gated — see AccountBar-style trigger in
+// Title.tsx) — guarantees every spin lands on a team with a 90+ draftable
+// player, for testing without grinding through random spins. Not a real
+// security boundary (the code ships in this public bundle like everything
+// else client-side) — just enough to keep it out of a casual player's way.
+const DEV_MODE_KEY = "seventeen-oh-dev-mode";
+const DEV_CODE = "170GODMODE";
+const DEV_MIN_OVR = 90;
+
+function loadDevMode(): boolean {
+  try {
+    return localStorage.getItem(DEV_MODE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function saveDevMode(on: boolean) {
+  try {
+    if (on) localStorage.setItem(DEV_MODE_KEY, "1");
+    else localStorage.removeItem(DEV_MODE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 interface BestRecord {
   record?: string;
   wins?: number;
@@ -67,6 +92,7 @@ export function useGame() {
   const [screen, setScreen] = useState<Screen>("title");
   const [mode, setModeState] = useState<Mode>("classic");
   const [best, setBest] = useState<BestRecord | null>(null);
+  const [devMode, setDevMode] = useState(false);
 
   // draft
   const [filled, setFilled] = useState<FilledSlots>({});
@@ -97,9 +123,21 @@ export function useGame() {
 
   useEffect(() => {
     setBest(loadBest());
+    setDevMode(loadDevMode());
   }, []);
 
   const setMode = useCallback((m: Mode) => setModeState(m), []);
+
+  /** Enters the code typed into the hidden trigger. Toggles dev mode on a
+   * correct code (on -> off, off -> on); does nothing on a wrong one. */
+  const tryDevCode = useCallback((code: string) => {
+    if (code !== DEV_CODE) return;
+    setDevMode((prev) => {
+      const next = !prev;
+      saveDevMode(next);
+      return next;
+    });
+  }, []);
 
   // A brand-new round is a fresh pull of the lever — both reels always spin,
   // even if the random result happens to repeat the previous round's team
@@ -124,14 +162,14 @@ export function useGame() {
     setUsedEras([]);
     setRespinTeamLeft(RESPIN_START);
     setRespinEraLeft(RESPIN_START);
-    applyFreshSpin(spinRound([], nextFilled));
+    applyFreshSpin(spinRound([], nextFilled, Math.random, devMode ? DEV_MIN_OVR : 0));
     setSeason(null);
     setAutoplay(false);
     setProjection(null);
     setSeasonSummary(null);
     seasonCounted.current = false;
     setScreen("draft");
-  }, [applyFreshSpin]);
+  }, [applyFreshSpin, devMode]);
 
   const choose = useCallback(
     (player: Player, slotKey: string) => {
@@ -146,28 +184,28 @@ export function useGame() {
         setSeason(enterSeason(strength));
         setScreen("season");
       } else {
-        applyFreshSpin(spinRound(nextUsedEras, nextFilled));
+        applyFreshSpin(spinRound(nextUsedEras, nextFilled, Math.random, devMode ? DEV_MIN_OVR : 0));
       }
     },
-    [filled, usedEras, spin, applyFreshSpin]
+    [filled, usedEras, spin, applyFreshSpin, devMode]
   );
 
   const respinTeam = useCallback(() => {
     if (!spin || respinTeamLeft <= 0) return;
-    const newTeam = pickTeamSwap(spin.era, spin.team, filled);
+    const newTeam = pickTeamSwap(spin.era, spin.team, filled, Math.random, devMode ? DEV_MIN_OVR : 0);
     if (!newTeam) return;
     applyTargetedSpin({ era: spin.era, team: newTeam }, spin);
     setRespinTeamLeft((n) => n - 1);
-  }, [spin, filled, respinTeamLeft, applyTargetedSpin]);
+  }, [spin, filled, respinTeamLeft, applyTargetedSpin, devMode]);
 
   const respinEra = useCallback(() => {
     if (!spin || respinEraLeft <= 0) return;
-    const next = pickEraSwap(usedEras, spin.era, spin.team, filled, lastEraRef.current);
+    const next = pickEraSwap(usedEras, spin.era, spin.team, filled, lastEraRef.current, Math.random, devMode ? DEV_MIN_OVR : 0);
     if (!next) return;
     lastEraRef.current = spin.era; // remember what we just left
     applyTargetedSpin(next, spin);
     setRespinEraLeft((n) => n - 1);
-  }, [spin, usedEras, filled, respinEraLeft, applyTargetedSpin]);
+  }, [spin, usedEras, filled, respinEraLeft, applyTargetedSpin, devMode]);
 
   const eraSwapAvailable = spin ? canSwapEra(usedEras, spin.era) && respinEraLeft > 0 : false;
 
@@ -247,6 +285,8 @@ export function useGame() {
     best,
     setMode,
     startDraft,
+    devMode,
+    tryDevCode,
     // draft
     filled,
     usedEras,

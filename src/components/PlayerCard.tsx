@@ -17,14 +17,26 @@ export function PlayerCard({
   mode,
   filled,
   onDraft,
+  targetFilter,
+  lockedNote,
 }: {
   player: Player;
   mode: "classic" | "blind";
   filled: FilledSlots;
   onDraft: (slotKey: string) => void;
+  /** Narrows which of this player's normally-legal slots are offered right
+   *  now (e.g. daily mode hiding a move that would strand a later slot).
+   *  Applied before the one-button-per-label dedup below, so a blocked
+   *  slot doesn't hide a sibling slot (RB1 vs RB2) that's still fine. */
+  targetFilter?: (slotKey: string) => boolean;
+  /** Overrides the locked-state message — used when targets are empty
+   *  because targetFilter blocked them, not because the position is full. */
+  lockedNote?: string;
 }) {
   const seen = new Set<string>();
-  const targets = targetsFor(player, filled).filter((key) => {
+  const rawTargets = targetsFor(player, filled);
+  const filtered = targetFilter ? rawTargets.filter(targetFilter) : rawTargets;
+  const targets = filtered.filter((key) => {
     const l = labelOf(key);
     if (seen.has(l)) return false;
     seen.add(l);
@@ -55,10 +67,11 @@ export function PlayerCard({
       )}
       {locked ? (
         <span className="locked-note">
-          {(() => {
-            const lbls = uniq(mappableSlots(player.pos).map((s) => s.label));
-            return lbls.join(" / ") + (lbls.length > 1 ? " slots filled" : " slot filled");
-          })()}
+          {lockedNote ??
+            (() => {
+              const lbls = uniq(mappableSlots(player.pos).map((s) => s.label));
+              return lbls.join(" / ") + (lbls.length > 1 ? " slots filled" : " slot filled");
+            })()}
         </span>
       ) : (
         <span className="targets">

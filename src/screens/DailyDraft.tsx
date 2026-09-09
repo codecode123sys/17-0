@@ -1,4 +1,5 @@
 import { SLOTS, openSlots, roundPlayers, targetsFor } from "../engine/draft";
+import { canDraftIntoSlot } from "../engine/daily";
 import { PlayerCard } from "../components/PlayerCard";
 import { TeamBadge } from "../components/TeamBadge";
 import type { GameController } from "../state/useGame";
@@ -78,15 +79,23 @@ export function DailyDraft({ game }: { game: GameController }) {
               : "Nothing draftable here — pick another tile."}
           </p>
           <div className="cards">
-            {cards.map((p) => (
-              <PlayerCard
-                key={p.id}
-                player={p}
-                mode="blind"
-                filled={filled}
-                onDraft={(slotKey) => chooseDaily(p, slotKey)}
-              />
-            ))}
+            {cards.map((p) => {
+              const feasible = (slotKey: string) =>
+                canDraftIntoSlot(dailyBoard, dailyUsedKeys, filled, selectedTile.key, slotKey);
+              const rawTargets = targetsFor(p, filled);
+              const strandsABoard = rawTargets.length > 0 && !rawTargets.some(feasible);
+              return (
+                <PlayerCard
+                  key={p.id}
+                  player={p}
+                  mode="blind"
+                  filled={filled}
+                  onDraft={(slotKey) => chooseDaily(p, slotKey)}
+                  targetFilter={feasible}
+                  lockedNote={strandsABoard ? "would leave a slot no one left could fill" : undefined}
+                />
+              );
+            })}
           </div>
         </>
       )}

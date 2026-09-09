@@ -109,6 +109,60 @@ export function tilePlayers(tile: DailyTile): Player[] {
   return PLAYERS.filter((p) => p.era === tile.era && p.team === tile.team);
 }
 
+function tileCanFillSlot(tile: DailyTile, slotKey: string): boolean {
+  const slot = SLOTS.find((s) => s.key === slotKey);
+  if (!slot) return false;
+  return tilePlayers(tile).some((p) => slot.pos.includes(p.pos));
+}
+
+/** Whether every remaining tile can still be matched to its own distinct
+ * remaining slot (Kuhn's algorithm — tiny inputs, augmenting paths are
+ * plenty fast). Since the board is built one tile per slot with no slack,
+ * losing this property for even one candidate move means some later slot
+ * would have nobody left who can fill it. */
+function hasPerfectMatching(tiles: DailyTile[], slotKeys: string[]): boolean {
+  if (tiles.length !== slotKeys.length) return false;
+  const matchSlotToTile = new Array<number>(slotKeys.length).fill(-1);
+
+  function tryAssign(tileIdx: number, visited: boolean[]): boolean {
+    for (let s = 0; s < slotKeys.length; s++) {
+      if (visited[s] || !tileCanFillSlot(tiles[tileIdx], slotKeys[s])) continue;
+      visited[s] = true;
+      if (matchSlotToTile[s] === -1 || tryAssign(matchSlotToTile[s], visited)) {
+        matchSlotToTile[s] = tileIdx;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  let matched = 0;
+  for (let i = 0; i < tiles.length; i++) {
+    if (tryAssign(i, new Array(slotKeys.length).fill(false))) matched++;
+  }
+  return matched === tiles.length;
+}
+
+/** Whether drafting from `tileKey` into `slotKey` keeps the rest of the
+ * board completable. Since one tile is fully spent per pick — every other
+ * player on it becomes unreachable once you draft anyone from it — a
+ * locally fine-looking pick (e.g. slotting a dual-position player into the
+ * "wrong" slot) can silently strand a later slot with zero remaining
+ * tiles able to fill it. Checked before every draft action, not just at
+ * board-generation time, since generateDailyBoard only guarantees *some*
+ * completion exists, not that every path a player might take reaches one. */
+export function canDraftIntoSlot(
+  board: DailyTile[],
+  usedTileKeys: string[],
+  filled: FilledSlots,
+  tileKey: string,
+  slotKey: string
+): boolean {
+  const remainingTiles = board.filter((t) => t.key !== tileKey && !usedTileKeys.includes(t.key));
+  const remainingSlotKeys = SLOTS.filter((s) => s.key !== slotKey && !filled[s.key]).map((s) => s.key);
+  return hasPerfectMatching(remainingTiles, remainingSlotKeys);
+}
+
 /** The best possible roster achievable from this exact 8-tile board — one
  * player drafted from each tile, into a distinct slot, maximizing total
  * roster strength. Solved by brute-forcing every tile-to-slot assignment

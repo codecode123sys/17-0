@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { SLOTS, ERA_CAP } from "./draft";
-import { bestPossibleRoster, generateDailyBoard, tilePlayers, todayKey } from "./daily";
+import type { FilledSlots } from "./draft";
+import { PLAYERS } from "../data/players";
+import { bestPossibleRoster, canDraftIntoSlot, generateDailyBoard, tilePlayers, todayKey } from "./daily";
+import type { DailyTile } from "./daily";
 
 describe("todayKey", () => {
   it("formats as YYYY-MM-DD", () => {
@@ -58,5 +61,33 @@ describe("bestPossibleRoster", () => {
     const roster = bestPossibleRoster(board)!;
     const names = SLOTS.map((s) => roster[s.key]!.name);
     expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe("canDraftIntoSlot", () => {
+  // Lions 2000s can fill either QB (Joey Harrington) or WR (Roy Williams);
+  // Browns 2000s can only fill WR (Dennis Northcutt / Braylon Edwards / a
+  // TE) — it has no QB. With only these two tiles left and only QB + WR1
+  // open, using Lions' dual-eligibility on WR1 strands Browns with no way
+  // to fill QB — the exact bug report: a WR spot with nothing usable left
+  // to fill it because an earlier pick, though locally legal, burned the
+  // only tile that could still cover a *different* open slot.
+  const lions: DailyTile = { key: "lions-2000s", era: "2000s", team: "Lions" };
+  const browns: DailyTile = { key: "browns-2000s", era: "2000s", team: "Browns" };
+  const board = [lions, browns];
+
+  // Every other slot already filled, so QB and WR1 are the only two open
+  // slots left — a stand-in for the true mid-draft state this guards.
+  const filled: FilledSlots = {};
+  for (const s of SLOTS) {
+    if (s.key !== "QB" && s.key !== "WR1") filled[s.key] = PLAYERS[0];
+  }
+
+  it("blocks a pick that would strand a later slot", () => {
+    expect(canDraftIntoSlot(board, [], filled, lions.key, "WR1")).toBe(false);
+  });
+
+  it("allows the pick that keeps the board completable", () => {
+    expect(canDraftIntoSlot(board, [], filled, lions.key, "QB")).toBe(true);
   });
 });

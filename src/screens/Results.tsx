@@ -113,26 +113,31 @@ export function Results({ game }: { game: GameController }) {
 
       {isDaily && dailyBestRoster && (
         <div className="panel-chart">
-          <h3>The best possible roster from today&rsquo;s board</h3>
-          <div className="recap">
+          <h3>You vs. today&rsquo;s optimal roster</h3>
+          <div className="compare-list">
             {SLOTS.map((s) => {
-              const p = dailyBestRoster[s.key];
               const yours = filled[s.key];
-              if (!p) return null;
-              const nailedIt = yours && yours.id === p.id;
+              const best = dailyBestRoster[s.key];
+              if (!yours || !best) return null;
+              const matched = yours.id === best.id;
               return (
-                <div key={s.key} className="r">
-                  <div className="r-top">
-                    <PlayerPortrait player={p} />
-                    <div className="pos">{s.label}</div>
+                <div key={s.key} className={"compare-row" + (matched ? " match" : "")}>
+                  <div className="compare-pos">{s.label}</div>
+                  <div className="compare-side">
+                    <span className="lbl">You</span>
+                    <span className="nm">
+                      <TeamBadge team={yours.team} /> {yours.name}
+                    </span>
+                    <span className="tag">{yours.era}</span>
                   </div>
-                  <div className="nm">
-                    {p.name}
-                    {nailedIt && " ✓"}
+                  <div className="compare-side">
+                    <span className="lbl">Optimal</span>
+                    <span className="nm">
+                      <TeamBadge team={best.team} /> {best.name}
+                    </span>
+                    <span className="tag">{best.era}</span>
                   </div>
-                  <div className="mt">
-                    <TeamBadge team={p.team} /> {p.era} &middot; OVR {p.ovr}
-                  </div>
+                  <div className="compare-mark">{matched ? "✓" : "—"}</div>
                 </div>
               );
             })}

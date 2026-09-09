@@ -664,14 +664,77 @@
     color: var(--muted);
   }
 
-  .tile-btn {
+  .daily-board {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .tile {
     width: 100%;
+    text-align: left;
     font: inherit;
     color: inherit;
+    padding: 0;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
     cursor: pointer;
+    transition: border-color .12s ease, box-shadow .12s ease, transform .08s ease;
   }
-  .tile-btn.active { border-color: var(--accent-strong); box-shadow: var(--shadow); }
-  .tile-btn.locked { cursor: default; }
+  .tile:hover:not(:disabled) { border-color: var(--accent); box-shadow: var(--shadow); }
+  .tile:active:not(:disabled) { transform: translateY(1px); }
+  .tile.active { border-color: var(--accent-strong); box-shadow: var(--shadow); }
+  .tile:disabled { cursor: default; }
+  .tile-swatch {
+    position: relative;
+    height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(142deg, var(--c1) 46%, var(--c2));
+  }
+  .tile-abbr {
+    font-family: "Anton", sans-serif;
+    font-size: 24px;
+    letter-spacing: .02em;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+  }
+  .tile.used .tile-swatch { filter: grayscale(1) opacity(.5); }
+  .tile.used .tile-body { opacity: .5; }
+  .tile-check {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 14, 12, .48);
+    color: #fff;
+    font-family: "Oswald", sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: 11px;
+  }
+  .tile-body {
+    padding: 8px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .tile-team {
+    font-family: "Oswald", sans-serif;
+    font-weight: 600;
+    font-size: 13.5px;
+    line-height: 1.15;
+  }
+  .tile-era {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    color: var(--muted);
+    letter-spacing: .03em;
+  }
 
   .roster {
     margin-top: 26px;
@@ -1053,6 +1116,62 @@
   .recap .r .nm { font-family: "Oswald", sans-serif; font-weight: 500; font-size: 13.5px; line-height: 1.2; margin-top: 2px; }
   .recap .r .mt { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--muted); margin-top: 3px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
   .recap .r .mt.accolades { color: var(--accent-strong); font-style: italic; margin-top: 1px; }
+
+  .compare-list {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .compare-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 1fr 20px;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .compare-row.match { border-color: var(--accent-strong); }
+  .compare-pos {
+    font-family: "Oswald", sans-serif;
+    font-weight: 700;
+    font-size: 11.5px;
+    letter-spacing: .05em;
+    color: var(--accent-strong);
+  }
+  .compare-side { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .compare-side .lbl {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+  }
+  .compare-side .nm {
+    font-family: "Oswald", sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .compare-side .tag {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .compare-mark {
+    text-align: center;
+    font-family: "Oswald", sans-serif;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .compare-row.match .compare-mark { color: var(--accent-strong); }
 
   .result-actions {
     margin-top: 24px;

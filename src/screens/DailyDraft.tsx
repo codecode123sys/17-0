@@ -1,5 +1,7 @@
+import type { CSSProperties } from "react";
 import { SLOTS, openSlots, roundPlayers, targetsFor } from "../engine/draft";
 import { canDraftIntoSlot } from "../engine/daily";
+import { badgeFor } from "../engine/visuals";
 import { PlayerCard } from "../components/PlayerCard";
 import { TeamBadge } from "../components/TeamBadge";
 import type { GameController } from "../state/useGame";
@@ -45,27 +47,28 @@ export function DailyDraft({ game }: { game: GameController }) {
         player into an open slot.
       </p>
 
-      <div className="cards" role="group" aria-label="Today's tiles">
+      <div className="daily-board" role="group" aria-label="Today's tiles">
         {dailyBoard.map((tile) => {
           const used = usedSet.has(tile.key);
           const active = tile.key === dailySelectedKey;
+          const m = badgeFor(tile.team);
+          const style = { "--c1": m.primary, "--c2": m.secondary } as CSSProperties;
           return (
             <button
               key={tile.key}
               type="button"
-              className={"card tile-btn" + (used ? " locked" : "") + (active ? " active" : "")}
+              className={"tile" + (used ? " used" : "") + (active ? " active" : "")}
               disabled={used}
               onClick={() => selectDailyTile(tile.key)}
             >
-              <div className="card-head">
-                <div className="card-id">
-                  <span className="name">
-                    <TeamBadge team={tile.team} /> {tile.team}
-                  </span>
-                  <span className="meta">{tile.era}</span>
-                </div>
+              <div className="tile-swatch" style={style}>
+                <span className="tile-abbr">{m.abbr}</span>
+                {used && <span className="tile-check">Drafted</span>}
               </div>
-              {used && <span className="locked-note">drafted from</span>}
+              <div className="tile-body">
+                <span className="tile-team">{tile.team}</span>
+                <span className="tile-era">{tile.era}</span>
+              </div>
             </button>
           );
         })}

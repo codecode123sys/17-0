@@ -53,6 +53,26 @@ function saveDevMode(on: boolean) {
   }
 }
 
+// One attempt per calendar day, same as the board itself — stores the date
+// key of the last daily challenge started on this device. Dev mode ignores
+// this so testing doesn't burn the real thing.
+const DAILY_PLAYED_KEY = "seventeen-oh-daily-played";
+
+function loadDailyPlayedDate(): string | null {
+  try {
+    return localStorage.getItem(DAILY_PLAYED_KEY);
+  } catch {
+    return null;
+  }
+}
+function saveDailyPlayedDate(date: string) {
+  try {
+    localStorage.setItem(DAILY_PLAYED_KEY, date);
+  } catch {
+    /* ignore */
+  }
+}
+
 interface BestRecord {
   record?: string;
   wins?: number;
@@ -131,10 +151,12 @@ export function useGame() {
   const [dailySelectedKey, setDailySelectedKey] = useState<string | null>(null);
   const [dailyBestRoster, setDailyBestRoster] = useState<FilledSlots | null>(null);
   const [isDaily, setIsDaily] = useState(false);
+  const [dailyPlayedToday, setDailyPlayedToday] = useState(false);
 
   useEffect(() => {
     setBest(loadBest());
     setDevMode(loadDevMode());
+    setDailyPlayedToday(loadDailyPlayedDate() === todayKey());
   }, []);
 
   const setMode = useCallback((m: Mode) => setModeState(m), []);
@@ -203,7 +225,9 @@ export function useGame() {
   );
 
   const startDailyChallenge = useCallback(() => {
-    const board = generateDailyBoard(todayKey());
+    if (dailyPlayedToday && !devMode) return;
+    const today = todayKey();
+    const board = generateDailyBoard(today);
     setDailyBoard(board);
     setDailyUsedKeys([]);
     setDailySelectedKey(null);
@@ -216,8 +240,12 @@ export function useGame() {
     setProjection(null);
     setSeasonSummary(null);
     seasonCounted.current = false;
+    if (!devMode) {
+      saveDailyPlayedDate(today);
+      setDailyPlayedToday(true);
+    }
     setScreen("dailyDraft");
-  }, []);
+  }, [dailyPlayedToday, devMode]);
 
   const selectDailyTile = useCallback((key: string) => {
     setDailySelectedKey((prev) => (prev === key ? null : key));
@@ -368,6 +396,7 @@ export function useGame() {
     viewLeaderboard,
     // daily challenge
     isDaily,
+    dailyPlayedToday,
     dailyBoard,
     dailyUsedKeys,
     dailySelectedKey,

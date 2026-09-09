@@ -9,7 +9,7 @@ const TAPS_TO_REVEAL = 7;
 const TAP_WINDOW_MS = 3000;
 
 export function Title({ game }: { game: GameController }) {
-  const { mode, setMode, startDraft, best, viewHistory, viewLeaderboard, devMode, tryDevCode } = game;
+  const { mode, setMode, startDraft, best, viewHistory, viewLeaderboard, tryDevCode } = game;
   const [showCodeEntry, setShowCodeEntry] = useState(false);
   const [code, setCode] = useState("");
   const tapCountRef = useRef(0);
@@ -54,9 +54,7 @@ export function Title({ game }: { game: GameController }) {
           Draft an all-time NFL roster &mdash; eight players spread across the decades, an offense plus a defensive
           anchor &mdash; then find out if it can run the table.
         </p>
-        <div className="spec">
-          18 WEEKS &middot; 17 GAMES &middot; ZERO LOSSES{devMode && " · DEV MODE"}
-        </div>
+        <div className="spec">18 WEEKS &middot; 17 GAMES &middot; ZERO LOSSES</div>
       </div>
 
       <div className="controls">

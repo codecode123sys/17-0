@@ -264,9 +264,13 @@
   .best strong { color: var(--ink); font-family: "IBM Plex Mono", monospace; }
 
   .daily-card {
-    margin-top: 22px;
-    padding: 18px 22px;
-    text-align: center;
+    margin-top: 16px;
+    padding: 10px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 12px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-left: 3px solid var(--accent-strong);
@@ -275,9 +279,7 @@
   .daily-card-head {
     display: flex;
     align-items: baseline;
-    justify-content: center;
-    gap: 9px;
-    margin-bottom: 6px;
+    gap: 8px;
   }
   .daily-card-tag {
     font-family: "Oswald", sans-serif;
@@ -290,12 +292,6 @@
   .daily-card-date {
     font-family: "IBM Plex Mono", monospace;
     font-size: 11px;
-    color: var(--muted);
-  }
-  .daily-card p {
-    margin: 0 auto 14px;
-    max-width: 42ch;
-    font-size: 13px;
     color: var(--muted);
   }
 

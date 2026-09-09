@@ -113,8 +113,7 @@ export function Title({ game }: { game: GameController }) {
           <span className="daily-card-tag">Daily challenge</span>
           <span className="daily-card-date">{today}</span>
         </div>
-        <p>Same fixed board for everyone today, drafted blind &mdash; one shot, then see the best roster possible.</p>
-        <button className="btn accent-outline" onClick={startDailyChallenge} disabled={dailyLocked}>
+        <button className="btn accent-outline small" onClick={startDailyChallenge} disabled={dailyLocked}>
           {dailyLocked ? "Come back tomorrow" : "Play today's board"}
         </button>
       </div>

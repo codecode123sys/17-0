@@ -1,4 +1,4 @@
-import { doc, getDoc, onSnapshot, runTransaction, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, limit, onSnapshot, query, runTransaction, setDoc, where } from "firebase/firestore";
 import { PLAYERS } from "../data/players";
 import type { Era } from "../data/players";
 import { SLOTS, rosterStrength } from "../engine/draft";
@@ -33,6 +33,7 @@ export interface MatchDoc {
   rosters: Record<string, Record<string, number>>; // uid -> slot key -> player id
   readyUids: string[];
   result: MatchResult | null;
+  quickMatch: boolean; // true for rooms created by joinQuickMatch, so it can find them
 }
 
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L
@@ -44,8 +45,10 @@ function randomCode(len = 5): string {
 }
 
 /** Creates a new room and returns its join code. Retries on the
- *  astronomically unlikely chance of a code collision. */
-export async function createRoom(name: string): Promise<string> {
+ *  astronomically unlikely chance of a code collision. `quickMatch` tags
+ *  the room as discoverable by joinQuickMatch below — an invite-link room
+ *  is otherwise identical, just never advertised. */
+export async function createRoom(name: string, quickMatch = false): Promise<string> {
   const uid = await getUid();
   const db = getDb();
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -65,11 +68,58 @@ export async function createRoom(name: string): Promise<string> {
       rosters: { [uid]: {} },
       readyUids: [],
       result: null,
+      quickMatch,
     };
     await setDoc(ref, match);
     return code;
   }
   throw new Error("Couldn't create a room — try again.");
+}
+
+const QUICK_MATCH_STALE_MS = 5 * 60 * 1000;
+
+/** Finds a random opponent: joins someone else's already-waiting
+ *  quick-match room if one exists, or creates one and returns its code
+ *  so the caller can wait on it exactly like an invite-link room (the
+ *  same subscribeRoom/waiting-room flow applies either way — the only
+ *  difference is how the code was obtained). Reuses the plain
+ *  matches collection (tagged `quickMatch: true`) rather than a separate
+ *  queue collection, so it needs no security rules beyond what
+ *  createRoom/joinRoom already require. */
+export async function joinQuickMatch(name: string): Promise<string> {
+  const uid = await getUid();
+  const db = getDb();
+
+  const q = query(collection(db, "matches"), where("quickMatch", "==", true), limit(20));
+  const snap = await getDocs(q);
+  const now = Date.now();
+  const candidates = snap.docs
+    .map((d) => ({ ref: d.ref, data: d.data() as MatchDoc }))
+    .filter((c) => c.data.status === "waiting" && c.data.hostUid !== uid && now - c.data.createdAt < QUICK_MATCH_STALE_MS)
+    .sort((a, b) => a.data.createdAt - b.data.createdAt);
+
+  for (const candidate of candidates) {
+    try {
+      await runTransaction(db, async (tx) => {
+        const fresh = await tx.get(candidate.ref);
+        if (!fresh.exists()) throw new Error("gone");
+        const m = fresh.data() as MatchDoc;
+        if (m.status !== "waiting" || m.guestUid) throw new Error("taken");
+        tx.update(candidate.ref, {
+          guestUid: uid,
+          guestName: name || "Anonymous",
+          status: "active",
+          [`rosters.${uid}`]: {},
+        });
+      });
+      return candidate.ref.id;
+    } catch {
+      continue; // someone else grabbed it (or it's gone) — try the next one
+    }
+  }
+
+  // No one was waiting (or every race was lost) — become the one waiting.
+  return createRoom(name, true);
 }
 
 /** Joins an existing waiting room as the guest. */

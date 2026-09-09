@@ -5,14 +5,14 @@ import { SLOTS, targetsFor } from "../engine/draft";
 import { badgeFor } from "../engine/visuals";
 import { firebaseConfigured } from "../lib/firebaseConfig";
 import { getUid } from "../lib/firebase";
-import { claimPlayer, createRoom, joinRoom, rosterFromIds, subscribeRoom } from "../lib/match";
+import { claimPlayer, createRoom, joinQuickMatch, joinRoom, rosterFromIds, subscribeRoom } from "../lib/match";
 import type { MatchDoc } from "../lib/match";
 import { getPlayerName } from "../lib/playerName";
 import { PlayerCard } from "../components/PlayerCard";
 import { TeamBadge } from "../components/TeamBadge";
 import type { GameController } from "../state/useGame";
 
-type Stage = "menu" | "create-wait" | "join-form" | "joining";
+type Stage = "menu" | "create-wait" | "join-form" | "joining" | "queueing";
 
 export function HeadToHead({ game }: { game: GameController }) {
   const { goHome, joinCodeFromUrl } = game;
@@ -62,6 +62,19 @@ export function HeadToHead({ game }: { game: GameController }) {
       setCode(newCode);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't create a room.");
+      setStage("menu");
+    }
+  }
+
+  async function handleQuickMatch() {
+    setError("");
+    setStage("queueing");
+    try {
+      const newCode = await joinQuickMatch(getPlayerName() || "Anonymous");
+      setMatch(null);
+      setCode(newCode);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't find a match.");
       setStage("menu");
     }
   }
@@ -117,7 +130,10 @@ export function HeadToHead({ game }: { game: GameController }) {
 
         {stage === "menu" && (
           <div className="controls">
-            <button className="btn" onClick={handleCreate} disabled={!uid}>
+            <button className="btn" onClick={handleQuickMatch} disabled={!uid}>
+              Quick match
+            </button>
+            <button className="btn ghost" onClick={handleCreate} disabled={!uid}>
               Create a room
             </button>
             <button className="btn ghost" onClick={() => setStage("join-form")}>
@@ -130,6 +146,7 @@ export function HeadToHead({ game }: { game: GameController }) {
         )}
 
         {stage === "create-wait" && <p className="pick-hint">Setting up your room&hellip;</p>}
+        {stage === "queueing" && <p className="pick-hint">Looking for an opponent&hellip;</p>}
 
         {(stage === "join-form" || stage === "joining") && (
           <form className="name-form" onSubmit={handleJoin} style={{ justifyContent: "center" }}>
@@ -155,14 +172,22 @@ export function HeadToHead({ game }: { game: GameController }) {
     return (
       <section className="view">
         <div className="result-board">
-          <div className="sub">Waiting for an opponent</div>
+          <div className="sub">
+            {match.quickMatch ? "Waiting for a random opponent" : "Waiting for an opponent"}
+          </div>
           <div className="record">{code}</div>
-          <div className="sub">Share this code, or copy the invite link below.</div>
+          <div className="sub">
+            {match.quickMatch
+              ? "Anyone else looking for a quick match will be matched with you automatically."
+              : "Share this code, or copy the invite link below."}
+          </div>
         </div>
         <div className="result-actions">
-          <button className="btn ghost" onClick={copyInviteLink}>
-            Copy invite link
-          </button>
+          {!match.quickMatch && (
+            <button className="btn ghost" onClick={copyInviteLink}>
+              Copy invite link
+            </button>
+          )}
           <button className="btn ghost" onClick={goHome}>
             Cancel
           </button>

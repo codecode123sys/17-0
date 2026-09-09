@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
+import type { FilledSlots } from "../engine/draft";
 import { SLOTS } from "../engine/draft";
+import { simulateDriveSequence } from "../engine/driveSim";
 import { badgeFor } from "../engine/visuals";
 import { firebaseConfigured } from "../lib/firebaseConfig";
 import { getUid } from "../lib/firebase";
@@ -16,7 +18,7 @@ import {
   subscribeRoom,
   useSkip,
 } from "../lib/match";
-import type { MatchDoc } from "../lib/match";
+import type { MatchDoc, MatchResult } from "../lib/match";
 import { getPlayerName } from "../lib/playerName";
 import { PlayerCard } from "../components/PlayerCard";
 import { TeamBadge } from "../components/TeamBadge";
@@ -222,51 +224,18 @@ export function HeadToHead({ game }: { game: GameController }) {
   const myFilled = rosterFromIds(myRosterIds);
   const oppFilled = rosterFromIds(oppRosterIds);
 
-  // ---------- done: reveal ----------
+  // ---------- done: simulate the drives, then reveal ----------
   if (match.status === "done" && match.result) {
-    const iAmHost = uid === match.hostUid;
-    const myScore = iAmHost ? match.result.hostScore : match.result.guestScore;
-    const oppScore = iAmHost ? match.result.guestScore : match.result.hostScore;
-    const won = match.result.winnerUid === uid;
     return (
-      <section className="view">
-        <div className="result-board">
-          <div className="verdict">{won ? "You won" : `${otherName} won`}</div>
-          <div className={"record" + (won ? " perfect" : "")}>
-            {myScore}&ndash;{oppScore}
-          </div>
-          <div className="sub">one simulated game, your roster vs. theirs</div>
-        </div>
-
-        <div className="compare-list">
-          {SLOTS.map((slot) => {
-            const mine = myFilled[slot.key];
-            const theirs = oppFilled[slot.key];
-            return (
-              <div key={slot.key} className="compare-row">
-                <div className="compare-pos">{slot.label}</div>
-                <div className="compare-side">
-                  <span className="lbl">You</span>
-                  <span className="nm">{mine ? mine.name : "—"}</span>
-                </div>
-                <div className="compare-side">
-                  <span className="lbl">{otherName}</span>
-                  <span className="nm">{theirs ? theirs.name : "—"}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="result-actions">
-          <button className="btn" onClick={handleCreate}>
-            New match
-          </button>
-          <button className="btn ghost" onClick={goHome}>
-            Back to home
-          </button>
-        </div>
-      </section>
+      <GameReveal
+        result={match.result}
+        iAmHost={uid === match.hostUid}
+        otherName={otherName}
+        myFilled={myFilled}
+        oppFilled={oppFilled}
+        onRematch={handleCreate}
+        onHome={goHome}
+      />
     );
   }
 
@@ -363,6 +332,159 @@ export function HeadToHead({ game }: { game: GameController }) {
             );
           })}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+const DRIVE_DELAY_MS = 550;
+const DRIVE_LOG_SIZE = 6;
+
+function GameReveal({
+  result,
+  iAmHost,
+  otherName,
+  myFilled,
+  oppFilled,
+  onRematch,
+  onHome,
+}: {
+  result: MatchResult;
+  iAmHost: boolean;
+  otherName: string;
+  myFilled: FilledSlots;
+  oppFilled: FilledSlots;
+  onRematch: () => void;
+  onHome: () => void;
+}) {
+  const [sequence] = useState(() => simulateDriveSequence(result.hostScore, result.guestScore));
+  const [driveIndex, setDriveIndex] = useState(0);
+  const finished = driveIndex >= sequence.length;
+
+  useEffect(() => {
+    if (finished) return;
+    const id = window.setTimeout(() => setDriveIndex((i) => i + 1), prefersReducedMotion() ? 0 : DRIVE_DELAY_MS);
+    return () => window.clearTimeout(id);
+  }, [driveIndex, finished]);
+
+  if (!finished) {
+    const played = sequence.slice(0, driveIndex);
+    const liveHost = played.length ? played[played.length - 1].hostScore : 0;
+    const liveGuest = played.length ? played[played.length - 1].guestScore : 0;
+    const liveMe = iAmHost ? liveHost : liveGuest;
+    const liveOpp = iAmHost ? liveGuest : liveHost;
+    const recent = played.slice(-DRIVE_LOG_SIZE);
+    return (
+      <section className="view">
+        <div className="result-board">
+          <div className="verdict">Simulating the game&hellip;</div>
+          <div className="record">
+            {liveMe}&ndash;{liveOpp}
+          </div>
+          <div className="sub">live score &mdash; you vs. {otherName}</div>
+        </div>
+        <div className="drive-log">
+          {recent.map((ev, i) => {
+            const who = (ev.team === "host") === iAmHost ? "You" : otherName;
+            return (
+              <div key={played.length - recent.length + i} className={"drive-row" + (ev.points > 0 ? " scored" : "")}>
+                <span className="who">{who}</span>
+                <span className="what">{ev.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <FinalReveal
+      result={result}
+      iAmHost={iAmHost}
+      otherName={otherName}
+      myFilled={myFilled}
+      oppFilled={oppFilled}
+      onRematch={onRematch}
+      onHome={onHome}
+    />
+  );
+}
+
+function FinalReveal({
+  result,
+  iAmHost,
+  otherName,
+  myFilled,
+  oppFilled,
+  onRematch,
+  onHome,
+}: {
+  result: MatchResult;
+  iAmHost: boolean;
+  otherName: string;
+  myFilled: FilledSlots;
+  oppFilled: FilledSlots;
+  onRematch: () => void;
+  onHome: () => void;
+}) {
+  const myScore = iAmHost ? result.hostScore : result.guestScore;
+  const oppScore = iAmHost ? result.guestScore : result.hostScore;
+  const myStrength = iAmHost ? result.hostStrength : result.guestStrength;
+  const oppStrength = iAmHost ? result.guestStrength : result.hostStrength;
+  const won = iAmHost ? result.hostScore > result.guestScore : result.guestScore > result.hostScore;
+
+  const betterTeamLine =
+    myStrength === oppStrength
+      ? "Dead even on paper."
+      : myStrength > oppStrength
+        ? "You had the better team on paper."
+        : `${otherName} had the better team on paper.`;
+
+  return (
+    <section className="view">
+      <div className="result-board">
+        <div className="verdict">{won ? "You won" : `${otherName} won`}</div>
+        <div className={"record" + (won ? " perfect" : "")}>
+          {myScore}&ndash;{oppScore}
+        </div>
+        <div className="sub">
+          Roster strength &mdash; you {myStrength.toFixed(1)} &middot; {otherName} {oppStrength.toFixed(1)}
+        </div>
+        <div className="sub">{betterTeamLine}</div>
+      </div>
+
+      <div className="compare-list">
+        {SLOTS.map((slot) => {
+          const mine = myFilled[slot.key];
+          const theirs = oppFilled[slot.key];
+          return (
+            <div key={slot.key} className="compare-row">
+              <div className="compare-pos">{slot.label}</div>
+              <div className="compare-side">
+                <span className="lbl">You</span>
+                <span className="nm">{mine ? `${mine.name} · OVR ${mine.ovr}` : "—"}</span>
+              </div>
+              <div className="compare-side">
+                <span className="lbl">{otherName}</span>
+                <span className="nm">{theirs ? `${theirs.name} · OVR ${theirs.ovr}` : "—"}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="result-actions">
+        <button className="btn" onClick={onRematch}>
+          New match
+        </button>
+        <button className="btn ghost" onClick={onHome}>
+          Back to home
+        </button>
       </div>
     </section>
   );

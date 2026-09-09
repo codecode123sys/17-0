@@ -267,6 +267,60 @@ that, at this stage, a local device history serves just as well. Worth
 revisiting once cross-device history is something players actually ask
 for.
 
+## Live head-to-head (optional)
+
+Two players draft from the same live 16-tile board at once — once either
+player drafts a player from a tile, it's gone for both — then, once both
+rosters are full, the engine simulates one game between the two rosters
+to declare a winner. Rooms are joined by a short code or invite link
+(`?join=CODE`), no accounts. See `src/lib/match.ts` for the room/claim
+logic and `src/screens/HeadToHead.tsx` for the UI.
+
+This needs a live backend, unlike everything else in the app — it's the
+one feature that genuinely can't work from localStorage alone, since two
+different browsers have to see each other's picks in real time. It uses
+Firebase (Firestore + anonymous sign-in). The whole Firebase SDK is
+lazy-loaded only when a visitor opens head-to-head (see `App.tsx`'s
+`lazy(...)` import), so it never touches the main bundle otherwise, and
+the "Head-to-head" button on the title screen only appears at all once
+it's configured — leave the env vars blank and this feature just doesn't
+exist for players.
+
+**One-time setup:**
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) and create a project (the free "Spark" plan is enough).
+2. **Build → Firestore Database → Create database** — start in production mode (the security rules below lock it down properly, so production mode is fine from the start).
+3. **Build → Authentication → Get started → Sign-in method → Anonymous → Enable.** This is the only auth method used — no email, no password, no real accounts, just a stable per-browser id to tell the two players apart.
+4. In Firestore, open the **Rules** tab and replace the default with:
+
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /matches/{code} {
+         allow read: if request.auth != null;
+         allow create: if request.auth != null
+           && request.resource.data.hostUid == request.auth.uid
+           && request.resource.data.status == 'waiting';
+         allow update: if request.auth != null
+           && (resource.data.hostUid == request.auth.uid
+               || resource.data.guestUid == request.auth.uid
+               || request.resource.data.guestUid == request.auth.uid);
+         allow delete: if false;
+       }
+     }
+   }
+   ```
+
+   This restricts every read/write to signed-in (anonymous is fine) users, and restricts writes to a match to the two players actually in it.
+5. **Project settings (gear icon) → General → Your apps → Add app → Web**, register it (no hosting setup needed), and copy the `firebaseConfig` values into `.env.local` (and into Vercel's Project Settings → Environment Variables for prod) — see `.env.example` for the exact variable names.
+
+**Known limitations, worth knowing before relying on this:**
+
+- Match documents are never cleaned up — Firestore's free tier is generous enough that this is a non-issue at hobby scale, but a scheduled cleanup (Cloud Function, or a manual sweep) would be needed eventually.
+- If a player closes the tab mid-match, their opponent currently just waits — there's no disconnect/forfeit handling yet.
+- Only invite-link rooms exist right now — a "quick match" random-opponent queue was scoped out for a follow-up, since it needs its own set of Firestore transactions (claiming a waiting stranger) that are much harder to get right without being able to test two live clients directly.
+
 ## Commands
 
 ```bash

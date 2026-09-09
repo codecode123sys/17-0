@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { NameForm } from "../components/NameForm";
+import { firebaseConfigured } from "../lib/firebaseConfig";
 import type { GameController } from "../state/useGame";
 
 // Clicking the score 7 times within 3 seconds reveals a code prompt.
@@ -20,6 +21,7 @@ export function Title({ game }: { game: GameController }) {
     tryDevCode,
     startDailyChallenge,
     dailyPlayedToday,
+    viewHeadToHead,
   } = game;
   const [showCodeEntry, setShowCodeEntry] = useState(false);
   const [code, setCode] = useState("");
@@ -117,6 +119,18 @@ export function Title({ game }: { game: GameController }) {
           {dailyLocked ? "Come back tomorrow" : "Play today's board"}
         </button>
       </div>
+
+      {firebaseConfigured() && (
+        <div className="daily-card">
+          <div className="daily-card-head">
+            <span className="daily-card-tag">Head-to-head</span>
+            <span className="daily-card-date">Live</span>
+          </div>
+          <button className="btn accent-outline small" onClick={viewHeadToHead}>
+            Play a friend
+          </button>
+        </div>
+      )}
 
       <NameForm />
 

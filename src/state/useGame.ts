@@ -19,7 +19,7 @@ import { logSeasonResult } from "../lib/logSeason";
 import { loadRuns, saveRun } from "../lib/runs";
 import type { Run } from "../lib/runs";
 
-export type Screen = "title" | "draft" | "dailyDraft" | "season" | "results" | "history" | "leaderboard";
+export type Screen = "title" | "draft" | "dailyDraft" | "season" | "results" | "history" | "leaderboard" | "h2h";
 export type Mode = "classic" | "blind";
 
 const RESPIN_START = 2;
@@ -110,8 +110,19 @@ export interface DraftSpin {
   team: string;
 }
 
+// If someone opened an invite link (?join=CODE), land straight on the
+// head-to-head screen with that code ready to go, instead of the title.
+function joinCodeFromLocation(): string | null {
+  try {
+    return new URLSearchParams(window.location.search).get("join");
+  } catch {
+    return null;
+  }
+}
+
 export function useGame() {
-  const [screen, setScreen] = useState<Screen>("title");
+  const [joinCodeFromUrl] = useState<string | null>(joinCodeFromLocation);
+  const [screen, setScreen] = useState<Screen>(joinCodeFromUrl ? "h2h" : "title");
   const [mode, setModeState] = useState<Mode>("classic");
   const [best, setBest] = useState<BestRecord | null>(null);
   const [devMode, setDevMode] = useState(false);
@@ -356,6 +367,7 @@ export function useGame() {
   }, []);
 
   const viewLeaderboard = useCallback(() => setScreen("leaderboard"), []);
+  const viewHeadToHead = useCallback(() => setScreen("h2h"), []);
 
   const draftAgain = startDraft;
 
@@ -367,6 +379,8 @@ export function useGame() {
     startDraft,
     devMode,
     tryDevCode,
+    joinCodeFromUrl,
+    viewHeadToHead,
     // draft
     filled,
     usedEras,

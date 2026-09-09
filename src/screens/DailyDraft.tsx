@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { Player } from "../data/players";
 import { SLOTS, openSlots, roundPlayers, targetsFor } from "../engine/draft";
 import { canDraftIntoSlot } from "../engine/daily";
 import { badgeFor } from "../engine/visuals";
@@ -16,15 +17,16 @@ export function DailyDraft({ game }: { game: GameController }) {
   const usedSet = new Set(dailyUsedKeys);
   const selectedTile = dailyBoard.find((t) => t.key === dailySelectedKey) ?? null;
 
+  // Only players who can actually be drafted right now — a position
+  // that's full, or a pick that would strand a later slot, just isn't
+  // shown, rather than shown disabled. See canDraftIntoSlot in daily.ts.
+  const feasible = (p: Player, tileKey: string) =>
+    targetsFor(p, filled).some((slotKey) => canDraftIntoSlot(dailyBoard, dailyUsedKeys, filled, tileKey, slotKey));
+
   const cards = selectedTile
     ? roundPlayers(selectedTile.era, selectedTile.team)
-        .slice()
-        .sort((a, b) => {
-          const ao = targetsFor(a, filled).length > 0 ? 1 : 0;
-          const bo = targetsFor(b, filled).length > 0 ? 1 : 0;
-          if (ao !== bo) return bo - ao;
-          return a.name.localeCompare(b.name);
-        })
+        .filter((p) => feasible(p, selectedTile.key))
+        .sort((a, b) => a.name.localeCompare(b.name))
     : [];
 
   return (
@@ -78,27 +80,20 @@ export function DailyDraft({ game }: { game: GameController }) {
         <>
           <p className="pick-hint">
             {cards.length
-              ? "Every player from this franchise and era is on the board, blind. Positions you’ve already filled are locked."
+              ? "Every player you can actually draft right now, blind — pick one into an open slot."
               : "Nothing draftable here — pick another tile."}
           </p>
           <div className="cards">
-            {cards.map((p) => {
-              const feasible = (slotKey: string) =>
-                canDraftIntoSlot(dailyBoard, dailyUsedKeys, filled, selectedTile.key, slotKey);
-              const rawTargets = targetsFor(p, filled);
-              const strandsABoard = rawTargets.length > 0 && !rawTargets.some(feasible);
-              return (
-                <PlayerCard
-                  key={p.id}
-                  player={p}
-                  mode="blind"
-                  filled={filled}
-                  onDraft={(slotKey) => chooseDaily(p, slotKey)}
-                  targetFilter={feasible}
-                  lockedNote={strandsABoard ? "would leave a slot no one left could fill" : undefined}
-                />
-              );
-            })}
+            {cards.map((p) => (
+              <PlayerCard
+                key={p.id}
+                player={p}
+                mode="blind"
+                filled={filled}
+                onDraft={(slotKey) => chooseDaily(p, slotKey)}
+                targetFilter={(slotKey) => canDraftIntoSlot(dailyBoard, dailyUsedKeys, filled, selectedTile.key, slotKey)}
+              />
+            ))}
           </div>
         </>
       )}

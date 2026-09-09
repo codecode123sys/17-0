@@ -40,6 +40,31 @@ describe("generateDailyBoard", () => {
     const board = generateDailyBoard("2026-06-30");
     for (const tile of board) expect(tilePlayers(tile).length).toBeGreaterThan(0);
   });
+
+  it("never repeats the exact same team+era tile twice on one board", () => {
+    for (const date of ["2026-01-01", "2026-04-12", "2026-09-08", "2026-12-25"]) {
+      const board = generateDailyBoard(date);
+      const pairs = board.map((t) => `${t.era}|${t.team}`);
+      expect(new Set(pairs).size).toBe(pairs.length);
+    }
+  });
+
+  it("prefers franchises deep enough to offer real choice, not just one player", () => {
+    // Not every tile can be guaranteed multiple players (some eras are
+    // thinner than others), but the vast majority should be, now that
+    // board-building prefers the same MIN_BOARD-deep franchises the
+    // classic draft's reel prefers.
+    let deepTiles = 0;
+    let totalTiles = 0;
+    for (const date of ["2026-01-01", "2026-04-12", "2026-09-08", "2026-12-25", "2026-03-15", "2026-06-30"]) {
+      const board = generateDailyBoard(date);
+      for (const tile of board) {
+        totalTiles++;
+        if (tilePlayers(tile).length >= 2) deepTiles++;
+      }
+    }
+    expect(deepTiles / totalTiles).toBeGreaterThan(0.9);
+  });
 });
 
 describe("bestPossibleRoster", () => {

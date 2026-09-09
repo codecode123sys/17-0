@@ -1,6 +1,6 @@
 import { PLAYERS } from "../data/players";
 import type { Era, Player } from "../data/players";
-import { ERAS, ERA_CAP, SLOTS, mappableSlots, teamsPresentInEra } from "./draft";
+import { ERAS, ERA_CAP, SLOTS, mappableSlots, teamsForEra, teamsPresentInEra } from "./draft";
 import type { FilledSlots } from "./draft";
 
 export interface DailyTile {
@@ -61,6 +61,32 @@ function coveredSlotKeys(board: DailyTile[]): Set<string> {
   return covered;
 }
 
+/** One attempt at a board for the given seed. Prefers franchises deep
+ * enough to offer real choice — `teamsForEra`'s own MIN_BOARD preference,
+ * same one the classic draft's reel uses — and never repeats the exact
+ * same team+era tile twice, so every tile is both distinct and (almost
+ * always) has more than one real option on it. */
+function buildBoardAttempt(dateKey: string, attempt: number): DailyTile[] {
+  const rand = mulberry32(hashString(`${dateKey}:${attempt}`));
+  const eraCounts = new Map<Era, number>();
+  const usedPairs = new Set<string>();
+  const board: DailyTile[] = [];
+  for (let i = 0; i < SLOTS.length; i++) {
+    const eraChoices = ERAS.filter((e) => (eraCounts.get(e) ?? 0) < ERA_CAP);
+    const era = pick(eraChoices, rand);
+
+    const deep = teamsForEra(era, {}).filter((t) => !usedPairs.has(`${era}|${t}`));
+    const any = teamsPresentInEra(era).filter((t) => !usedPairs.has(`${era}|${t}`));
+    const pool = deep.length ? deep : any.length ? any : teamsForEra(era, {});
+    const team = pick(pool, rand);
+
+    usedPairs.add(`${era}|${team}`);
+    eraCounts.set(era, (eraCounts.get(era) ?? 0) + 1);
+    board.push({ key: `${i}-${era}-${team}`, era, team });
+  }
+  return board;
+}
+
 /** Builds one day's fixed 8-tile board (era cap of 2, same as a normal
  * draft) from the given date key. Regenerates (still deterministically —
  * same date always retries the same way) if the first attempt can't
@@ -69,16 +95,7 @@ function coveredSlotKeys(board: DailyTile[]): Set<string> {
 export function generateDailyBoard(dateKey: string): DailyTile[] {
   const requiredSlotKeys = new Set(SLOTS.map((s) => s.key));
   for (let attempt = 0; attempt < 200; attempt++) {
-    const rand = mulberry32(hashString(`${dateKey}:${attempt}`));
-    const eraCounts = new Map<Era, number>();
-    const board: DailyTile[] = [];
-    for (let i = 0; i < SLOTS.length; i++) {
-      const eraChoices = ERAS.filter((e) => (eraCounts.get(e) ?? 0) < ERA_CAP);
-      const era = pick(eraChoices, rand);
-      const team = pick(teamsPresentInEra(era), rand);
-      eraCounts.set(era, (eraCounts.get(era) ?? 0) + 1);
-      board.push({ key: `${i}-${era}-${team}`, era, team });
-    }
+    const board = buildBoardAttempt(dateKey, attempt);
     const covered = coveredSlotKeys(board);
     let allCovered = true;
     for (const key of requiredSlotKeys) {
@@ -90,18 +107,8 @@ export function generateDailyBoard(dateKey: string): DailyTile[] {
     if (allCovered && bestPossibleRoster(board) !== null) return board;
   }
   // Astronomically unlikely to ever reach this given 32 franchises per era
-  // and 200 attempts, but fall back to the last attempt rather than throw.
-  const rand = mulberry32(hashString(dateKey));
-  const eraCounts = new Map<Era, number>();
-  const board: DailyTile[] = [];
-  for (let i = 0; i < SLOTS.length; i++) {
-    const eraChoices = ERAS.filter((e) => (eraCounts.get(e) ?? 0) < ERA_CAP);
-    const era = pick(eraChoices, rand);
-    const team = pick(teamsPresentInEra(era), rand);
-    eraCounts.set(era, (eraCounts.get(era) ?? 0) + 1);
-    board.push({ key: `${i}-${era}-${team}`, era, team });
-  }
-  return board;
+  // and 200 attempts, but fall back to a deterministic attempt rather than throw.
+  return buildBoardAttempt(dateKey, 0);
 }
 
 /** Every player available from this tile's roster. */

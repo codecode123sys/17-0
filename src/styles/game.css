@@ -247,6 +247,12 @@
     border-color: var(--line);
   }
   .btn.ghost:hover { border-color: var(--muted); filter: none; }
+  .btn.accent-outline {
+    background: transparent;
+    color: var(--accent-strong);
+    border-color: var(--accent-strong);
+  }
+  .btn.accent-outline:hover { background: var(--accent); color: var(--accent-ink); filter: none; }
   .btn:disabled { opacity: .4; cursor: not-allowed; }
 
   .best {

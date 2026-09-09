@@ -43,8 +43,22 @@ export function Title({ game }: { game: GameController }) {
     setShowCodeEntry(false);
   }
 
+  const dailyLocked = dailyPlayedToday && !devMode;
+  const today = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
   return (
     <section className="view">
+      <div className="home-nav">
+        <button className="btn ghost small" onClick={viewLeaderboard}>
+          Leaderboard
+        </button>
+        {!!best?.plays && (
+          <button className="btn ghost small" onClick={viewHistory}>
+            My runs
+          </button>
+        )}
+      </div>
+
       <div className="board">
         <div className="eyebrow">The perfect season</div>
         <div className="score" onClick={onScoreTap}>
@@ -92,23 +106,17 @@ export function Title({ game }: { game: GameController }) {
         <button className="btn" onClick={startDraft}>
           Start the draft
         </button>
-        <button
-          className="btn ghost"
-          onClick={startDailyChallenge}
-          disabled={dailyPlayedToday && !devMode}
-        >
-          {dailyPlayedToday && !devMode ? "Daily challenge — come back tomorrow" : "Daily challenge"}
-        </button>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn ghost small" onClick={viewLeaderboard}>
-            Leaderboard
-          </button>
-          {!!best?.plays && (
-            <button className="btn ghost small" onClick={viewHistory}>
-              My runs
-            </button>
-          )}
+      </div>
+
+      <div className="daily-card">
+        <div className="daily-card-head">
+          <span className="daily-card-tag">Daily challenge</span>
+          <span className="daily-card-date">{today}</span>
         </div>
+        <p>Same fixed board for everyone today, drafted blind &mdash; one shot, then see the best roster possible.</p>
+        <button className="btn ghost" onClick={startDailyChallenge} disabled={dailyLocked}>
+          {dailyLocked ? "Come back tomorrow" : "Play today's board"}
+        </button>
       </div>
 
       <NameForm />

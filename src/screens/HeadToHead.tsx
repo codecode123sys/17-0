@@ -1,11 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
-import { PLAYERS } from "../data/players";
-import { SLOTS, targetsFor } from "../engine/draft";
+import { SLOTS } from "../engine/draft";
 import { badgeFor } from "../engine/visuals";
 import { firebaseConfigured } from "../lib/firebaseConfig";
 import { getUid } from "../lib/firebase";
-import { claimPlayer, createRoom, joinQuickMatch, joinRoom, rosterFromIds, subscribeRoom } from "../lib/match";
+import {
+  createRoom,
+  draftPick,
+  draftableThisRound,
+  effectiveTile,
+  feasibleTargetsThisRound,
+  joinQuickMatch,
+  joinRoom,
+  rosterFromIds,
+  subscribeRoom,
+  useSkip,
+} from "../lib/match";
 import type { MatchDoc } from "../lib/match";
 import { getPlayerName } from "../lib/playerName";
 import { PlayerCard } from "../components/PlayerCard";
@@ -23,7 +33,6 @@ export function HeadToHead({ game }: { game: GameController }) {
   const [error, setError] = useState("");
   const [uid, setUid] = useState<string | null>(null);
   const [match, setMatch] = useState<MatchDoc | null>(null);
-  const [selectedTileKey, setSelectedTileKey] = useState<string | null>(null);
   const [copyToast, setCopyToast] = useState("");
   const unsubRef = useRef<null | (() => void)>(null);
 
@@ -108,14 +117,23 @@ export function HeadToHead({ game }: { game: GameController }) {
     }
   }
 
-  async function handleDraft(playerId: number, slotKey: string, tileKey: string) {
+  async function handleDraft(playerId: number, slotKey: string) {
     if (!code) return;
     setError("");
     try {
-      await claimPlayer(code, tileKey, slotKey, playerId);
-      setSelectedTileKey(null);
+      await draftPick(code, slotKey, playerId);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "That pick didn't go through — someone may have beaten you to it.");
+      setError(e instanceof Error ? e.message : "That pick didn't go through.");
+    }
+  }
+
+  async function handleSkip() {
+    if (!code) return;
+    setError("");
+    try {
+      await useSkip(code);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't use your skip.");
     }
   }
 
@@ -253,21 +271,21 @@ export function HeadToHead({ game }: { game: GameController }) {
   }
 
   // ---------- live draft ----------
-  const selectedTile = match.board.find((t) => t.key === selectedTileKey) ?? null;
-  const myFilledCount = Object.keys(myRosterIds).length;
+  const myRound = Object.keys(myRosterIds).length;
   const oppFilledCount = Object.keys(oppRosterIds).length;
+  const mySkipUsed = !!match.swaps[uid ?? ""];
+  const waitingOnOpponent = myRound >= SLOTS.length;
 
-  const cards = selectedTile
-    ? PLAYERS.filter((p) => p.era === selectedTile.era && p.team === selectedTile.team)
-        .filter((p) => targetsFor(p, myFilled).length > 0)
-        .sort((a, b) => b.ovr - a.ovr)
-    : [];
+  const tile = waitingOnOpponent ? null : effectiveTile(match, uid ?? "", myRound);
+  const cards = tile ? draftableThisRound(match.board, myRound, tile, myFilled).sort((a, b) => a.name.localeCompare(b.name)) : [];
+  const tileMeta = tile ? badgeFor(tile.team) : null;
+  const tileStyle = tileMeta ? ({ "--c1": tileMeta.primary, "--c2": tileMeta.secondary } as CSSProperties) : undefined;
 
   return (
     <section className="view">
       <div className="draft-head">
         <div className="round-n">
-          You <span>{myFilledCount}</span>
+          Round <span>{Math.min(myRound + 1, SLOTS.length)}</span>
           <span> / {SLOTS.length}</span>
         </div>
         <div className="picking">
@@ -277,55 +295,52 @@ export function HeadToHead({ game }: { game: GameController }) {
       {error && <p className="pick-hint">{error}</p>}
 
       <p className="pick-hint">
-        Same board, live &mdash; race {otherName} for the players you need. Once either of you drafts from a tile,
-        it&rsquo;s gone for both.
+        Same matchup each round for both of you, drafted blind and privately &mdash; you can even end up with the
+        same player. One personal skip each, just for you, if a round&rsquo;s matchup is one you&rsquo;d rather
+        avoid.
       </p>
 
-      <div className="daily-board" role="group" aria-label="Shared board">
-        {match.board.map((tile) => {
-          const claimant = match.claims[tile.key];
-          const used = !!claimant;
-          const byMe = claimant === uid;
-          const m = badgeFor(tile.team);
-          const style = { "--c1": m.primary, "--c2": m.secondary } as CSSProperties;
-          return (
-            <button
-              key={tile.key}
-              type="button"
-              className={"tile" + (used ? " used" : "") + (tile.key === selectedTileKey ? " active" : "")}
-              disabled={used}
-              onClick={() => setSelectedTileKey(tile.key)}
-            >
-              <div className="tile-swatch" style={style}>
-                <span className="tile-abbr">{m.abbr}</span>
-                {used && <span className="tile-check">{byMe ? "You" : otherName}</span>}
+      {waitingOnOpponent ? (
+        <p className="pick-hint">Your roster is set &mdash; waiting for {otherName} to finish theirs.</p>
+      ) : (
+        tile &&
+        tileMeta && (
+          <>
+            <div className="tile" style={{ maxWidth: 220, margin: "0 auto 14px" }}>
+              <div className="tile-swatch" style={tileStyle}>
+                <span className="tile-abbr">{tileMeta.abbr}</span>
               </div>
               <div className="tile-body">
                 <span className="tile-team">{tile.team}</span>
                 <span className="tile-era">{tile.era}</span>
               </div>
-            </button>
-          );
-        })}
-      </div>
+            </div>
 
-      {selectedTile && (
-        <>
-          <p className="pick-hint">
-            {cards.length ? "Draft one into an open slot." : "Nothing here fits an open slot of yours — pick another."}
-          </p>
-          <div className="cards">
-            {cards.map((p) => (
-              <PlayerCard
-                key={p.id}
-                player={p}
-                mode="classic"
-                filled={myFilled}
-                onDraft={(slotKey) => handleDraft(p.id, slotKey, selectedTile.key)}
-              />
-            ))}
-          </div>
-        </>
+            <div className="result-actions" style={{ marginTop: 0, marginBottom: 14 }}>
+              <button className="btn ghost small" onClick={handleSkip} disabled={mySkipUsed}>
+                {mySkipUsed ? "Skip used" : "Skip this matchup (1 left)"}
+              </button>
+            </div>
+
+            <p className="pick-hint">
+              {cards.length
+                ? "Draft one into an open slot, blind."
+                : "Nothing here fits an open slot of yours — this shouldn't happen; try refreshing."}
+            </p>
+            <div className="cards">
+              {cards.map((p) => (
+                <PlayerCard
+                  key={p.id}
+                  player={p}
+                  mode="blind"
+                  filled={myFilled}
+                  onDraft={(slotKey) => handleDraft(p.id, slotKey)}
+                  targetFilter={(slotKey) => feasibleTargetsThisRound(match.board, myRound, p, myFilled).includes(slotKey)}
+                />
+              ))}
+            </div>
+          </>
+        )
       )}
 
       <div className="roster">

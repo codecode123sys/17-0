@@ -269,12 +269,18 @@ for.
 
 ## Live head-to-head (optional)
 
-Two players draft from the same live 16-tile board at once — once either
-player drafts a player from a tile, it's gone for both — then, once both
-rosters are full, the engine simulates one game between the two rosters
-to declare a winner. Rooms are joined by a short code or invite link
-(`?join=CODE`), no accounts. See `src/lib/match.ts` for the room/claim
-logic and `src/screens/HeadToHead.tsx` for the UI.
+Two players draft against the identical sequence of 8 team/era matchups
+(the same board generator as the daily challenge, just seeded per-match
+instead of per-day) — round 1 is the same matchup for both, round 2 is
+the same matchup for both, and so on, drafted blind and entirely
+privately, so both players can even end up drafting the exact same real
+player with no conflict. Each player also gets one personal skip for the
+whole match — reroll whichever round you're currently facing into a new
+random matchup, just for you; your opponent's view of that round is
+unaffected. Once both rosters are full, the engine simulates one game
+between the two rosters to declare a winner. Rooms are joined by a short
+code or invite link (`?join=CODE`), no accounts. See `src/lib/match.ts`
+for the room/draft/skip logic and `src/screens/HeadToHead.tsx` for the UI.
 
 This needs a live backend, unlike everything else in the app — it's the
 one feature that genuinely can't work from localStorage alone, since two
@@ -319,7 +325,6 @@ exist for players.
 
 - Match documents are never cleaned up — Firestore's free tier is generous enough that this is a non-issue at hobby scale, but a scheduled cleanup (Cloud Function, or a manual sweep) would be needed eventually.
 - If a player closes the tab mid-match, their opponent currently just waits — there's no disconnect/forfeit handling yet.
-- Only invite-link rooms exist right now — a "quick match" random-opponent queue was scoped out for a follow-up, since it needs its own set of Firestore transactions (claiming a waiting stranger) that are much harder to get right without being able to test two live clients directly.
 
 ## Commands
 

@@ -116,18 +116,20 @@ export function tilePlayers(tile: DailyTile): Player[] {
   return PLAYERS.filter((p) => p.era === tile.era && p.team === tile.team);
 }
 
-function tileCanFillSlot(tile: DailyTile, slotKey: string): boolean {
+export function tileCanFillSlot(tile: DailyTile, slotKey: string): boolean {
   const slot = SLOTS.find((s) => s.key === slotKey);
   if (!slot) return false;
   return tilePlayers(tile).some((p) => slot.pos.includes(p.pos));
 }
 
-/** Whether every remaining tile can still be matched to its own distinct
- * remaining slot (Kuhn's algorithm — tiny inputs, augmenting paths are
- * plenty fast). Since the board is built one tile per slot with no slack,
- * losing this property for even one candidate move means some later slot
- * would have nobody left who can fill it. */
-function hasPerfectMatching(tiles: DailyTile[], slotKeys: string[]): boolean {
+/** Whether every one of `tiles` can still be matched to its own distinct
+ * one of `slotKeys` (Kuhn's algorithm — tiny inputs, augmenting paths are
+ * plenty fast). Used both by the daily challenge (one tile per slot, no
+ * slack — losing this property for even one candidate move means some
+ * later slot would have nobody left to fill it) and by head-to-head's
+ * sequential draft (checking the fixed remaining rounds against a
+ * player's own remaining open slots). */
+export function hasPerfectMatching(tiles: DailyTile[], slotKeys: string[]): boolean {
   if (tiles.length !== slotKeys.length) return false;
   const matchSlotToTile = new Array<number>(slotKeys.length).fill(-1);
 

@@ -134,6 +134,31 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/** A monotonic path from `start` to `end` (`count` points total, start and
+ * end inclusive) — each leg always advances toward `end` (never backtracks),
+ * with varied but purposeful-looking gains rather than uniform steps, by
+ * distributing `count - 1` randomized positive weights along the way
+ * rather than adding independent jitter to each point. */
+function monotonicPath(start: number, end: number, count: number, rand: () => number): number[] {
+  const legs = count - 1;
+  const weights: number[] = [];
+  let weightTotal = 0;
+  for (let i = 0; i < legs; i++) {
+    const w = 0.55 + rand(); // always positive, so the cumulative share only grows
+    weights.push(w);
+    weightTotal += w;
+  }
+  const path: number[] = [start];
+  let cumulative = 0;
+  for (let i = 0; i < legs; i++) {
+    cumulative += weights[i];
+    const isLast = i === legs - 1;
+    const value = isLast ? end : Math.round(start + (end - start) * (cumulative / weightTotal));
+    path.push(Math.max(0, Math.min(100, value)));
+  }
+  return path;
+}
+
 /** A plausible yard-by-yard path for one drive, 0-100 in the driving
  * team's own attacking direction (0 = their own goal line, 100 = the
  * opponent's) — for the live field animation, not anything that affects
@@ -141,24 +166,25 @@ function mulberry32(seed: number): () => number {
  * than Math.random, so both players' clients — each deriving this
  * independently from the same shared driveSequence, never sent over the
  * wire itself — animate the identical path instead of two different
- * ones for what's supposed to be one shared simulation. */
+ * ones for what's supposed to be one shared simulation.
+ *
+ * A field goal's path ends with one extra waypoint at 100 beyond where
+ * the drive itself actually stalled — the kick sailing through the
+ * uprights — so the UI can render that last leg as a distinct kick
+ * rather than more of the same walking-down-the-field motion. */
 export function deriveDrivePath(driveIndex: number, ev: DriveEvent): number[] {
   const rand = mulberry32(driveIndex * 7919 + ev.points * 31 + (ev.team === "host" ? 1 : 0) + 1);
-  const start = 15 + Math.floor(rand() * 20); // own 15-34
-  let end: number;
-  if (ev.points === 2) end = 1; // safety — tackled behind their own goal line
-  else if (ev.points === 3) end = 65 + Math.floor(rand() * 18); // stalls in field-goal range
-  else if (ev.points >= 6) end = 100; // touchdown
-  else end = 38 + Math.floor(rand() * 27); // drive stalls out, punt/turnover
+  const start = 22 + Math.floor(rand() * 8); // a tidy, standard-looking own 22-29 start
 
-  const steps = 3 + Math.floor(rand() * 3); // 3-5 waypoints, inclusive of start/end
-  const path: number[] = [start];
-  for (let i = 1; i < steps - 1; i++) {
-    const t = i / (steps - 1);
-    const base = start + (end - start) * t;
-    const jitter = (rand() - 0.5) * 10;
-    path.push(Math.max(0, Math.min(100, Math.round(base + jitter))));
-  }
-  path.push(end);
+  let driveEnd: number;
+  if (ev.points === 2) driveEnd = 1; // safety — tackled behind their own goal line
+  else if (ev.points === 3) driveEnd = 62 + Math.floor(rand() * 16); // spot for the kick attempt
+  else if (ev.points >= 6) driveEnd = 100; // touchdown
+  else driveEnd = 40 + Math.floor(rand() * 24); // drive stalls out, punt/turnover
+
+  const waypoints = 4 + Math.floor(rand() * 2); // 4-5 points, inclusive of start/end
+  const path = monotonicPath(start, driveEnd, waypoints, rand);
+
+  if (ev.points === 3) path.push(100); // the kick itself, through the uprights
   return path;
 }

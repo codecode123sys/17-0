@@ -414,6 +414,18 @@ export function HeadToHead({ game }: { game: GameController }) {
 
 const DRIVE_DELAY_MS = 1100;
 const DRIVE_LOG_SIZE = 6;
+const YARD_NUMBERS = [10, 20, 30, 40, 50, 40, 30, 20, 10];
+
+function GoalPost() {
+  return (
+    <svg className="field-goalpost" viewBox="0 0 24 48" aria-hidden="true">
+      <line x1="12" y1="48" x2="12" y2="24" stroke="#f2b73f" strokeWidth="3" strokeLinecap="round" />
+      <line x1="4" y1="24" x2="20" y2="24" stroke="#f2b73f" strokeWidth="3" strokeLinecap="round" />
+      <line x1="4" y1="24" x2="4" y2="4" stroke="#f2b73f" strokeWidth="3" strokeLinecap="round" />
+      <line x1="20" y1="24" x2="20" y2="4" stroke="#f2b73f" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 function GameReveal({
   result,
@@ -476,13 +488,17 @@ function GameReveal({
     const elapsedInDrive = elapsed - driveIndex * DRIVE_DELAY_MS;
     const driveProgress = Math.min(1, Math.max(0, elapsedInDrive / DRIVE_DELAY_MS));
     const path = deriveDrivePath(driveIndex, currentEvent);
-    const relativeYard = path[Math.min(path.length - 1, Math.floor(driveProgress * path.length))];
+    const stepIdx = Math.min(path.length - 1, Math.floor(driveProgress * path.length));
+    const relativeYard = path[stepIdx];
+    const isKicking = currentEvent.points === 3 && stepIdx === path.length - 1;
     // 0 is always your own goal line, 100 the opponent's, regardless of
     // who's actually driving — their drives are mirrored onto the same
     // scale so the ball always visibly advances toward whichever end
     // the team with the ball is attacking.
     const absoluteYard = currentMine ? relativeYard : 100 - relativeYard;
-    const yardLabel = relativeYard <= 50 ? `own ${relativeYard}` : `opp ${100 - relativeYard}`;
+    const yardLabel = isKicking
+      ? `${currentMine ? "You" : otherName} kicking it through!`
+      : `${currentMine ? "You" : otherName} driving — ball on the ${relativeYard <= 50 ? `own ${relativeYard}` : `opp ${100 - relativeYard}`}`;
 
     return (
       <section className="view">
@@ -508,24 +524,34 @@ function GameReveal({
         </div>
 
         <div className="field">
-          <div className="field-endzone mine" />
-          <div className="field-yardlines" />
-          <svg
-            className="field-ball"
-            viewBox="0 0 24 14"
-            style={{ left: `${absoluteYard}%`, transform: `translate(-50%, -50%)${currentMine ? "" : " scaleX(-1)"}` }}
-          >
-            <ellipse cx="12" cy="7" rx="11" ry="6.2" fill="#6b4423" stroke="#3a2412" strokeWidth="1" />
-            <line x1="7.5" y1="7" x2="16.5" y2="7" stroke="#f2e9d8" strokeWidth="1" />
-            <line x1="9.5" y1="5.3" x2="9.5" y2="8.7" stroke="#f2e9d8" strokeWidth="1" />
-            <line x1="12" y1="4.8" x2="12" y2="9.2" stroke="#f2e9d8" strokeWidth="1" />
-            <line x1="14.5" y1="5.3" x2="14.5" y2="8.7" stroke="#f2e9d8" strokeWidth="1" />
-          </svg>
-          <div className="field-endzone theirs" />
+          <div className="field-endzone mine">
+            <GoalPost />
+          </div>
+          <div className="field-play">
+            <div className="field-yardlines" />
+            {YARD_NUMBERS.map((n, i) => (
+              <span key={i} className="field-yard-num" style={{ left: `${(i + 1) * 10}%` }}>
+                {n}
+              </span>
+            ))}
+            <div
+              className={"field-ball-wrap" + (isKicking ? " kicking" : "")}
+              style={{ left: `${absoluteYard}%`, transform: `translate(-50%, -50%)${currentMine ? "" : " scaleX(-1)"}` }}
+            >
+              <svg className={"field-ball" + (isKicking ? " kicking" : "")} viewBox="0 0 24 14">
+                <ellipse cx="12" cy="7" rx="11" ry="6.2" fill="#6b4423" stroke="#3a2412" strokeWidth="1" />
+                <line x1="7.5" y1="7" x2="16.5" y2="7" stroke="#f2e9d8" strokeWidth="1" />
+                <line x1="9.5" y1="5.3" x2="9.5" y2="8.7" stroke="#f2e9d8" strokeWidth="1" />
+                <line x1="12" y1="4.8" x2="12" y2="9.2" stroke="#f2e9d8" strokeWidth="1" />
+                <line x1="14.5" y1="5.3" x2="14.5" y2="8.7" stroke="#f2e9d8" strokeWidth="1" />
+              </svg>
+            </div>
+          </div>
+          <div className="field-endzone theirs">
+            <GoalPost />
+          </div>
         </div>
-        <p className="field-caption">
-          {currentMine ? "You" : otherName} driving &mdash; ball on the {yardLabel}
-        </p>
+        <p className={"field-caption" + (isKicking ? " kicking" : "")}>{yardLabel}</p>
 
         <div className="drive-log">
           {recent.map((ev, i) => {

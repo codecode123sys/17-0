@@ -112,11 +112,13 @@ describe("deriveDrivePath", () => {
     for (let i = 0; i < 10; i++) expect(deriveDrivePath(i, touchdown).at(-1)).toBe(100);
   });
 
-  it("a field goal stalls out short of the goal line", () => {
+  it("a field goal's drive stalls in kicking range, then the kick itself sails through (100)", () => {
     for (let i = 0; i < 10; i++) {
-      const end = deriveDrivePath(i, fieldGoal).at(-1)!;
-      expect(end).toBeGreaterThanOrEqual(65);
-      expect(end).toBeLessThan(100);
+      const path = deriveDrivePath(i, fieldGoal);
+      expect(path.at(-1)).toBe(100); // the kick, always good
+      const spotForTheKick = path.at(-2)!;
+      expect(spotForTheKick).toBeGreaterThanOrEqual(62);
+      expect(spotForTheKick).toBeLessThan(100);
     }
   });
 
@@ -129,6 +131,25 @@ describe("deriveDrivePath", () => {
       const end = deriveDrivePath(i, punt).at(-1)!;
       expect(end).toBeGreaterThan(0);
       expect(end).toBeLessThan(100);
+    }
+  });
+
+  it("moves monotonically — never backtracks mid-drive", () => {
+    // The whole point of switching from independent-jitter waypoints to
+    // a cumulative-weight distribution: real yardage gains vary, but the
+    // ball shouldn't visibly lurch backward and forward on its way to
+    // a well-defined outcome.
+    for (const ev of [touchdown, fieldGoal, punt]) {
+      for (let i = 0; i < 10; i++) {
+        const path = deriveDrivePath(i, ev);
+        for (let j = 1; j < path.length; j++) expect(path[j]).toBeGreaterThanOrEqual(path[j - 1]);
+      }
+    }
+    // Safety runs the other way (pushed back toward the driving team's
+    // own goal line), so it should be monotonically non-increasing instead.
+    for (let i = 0; i < 10; i++) {
+      const path = deriveDrivePath(i, safety);
+      for (let j = 1; j < path.length; j++) expect(path[j]).toBeLessThanOrEqual(path[j - 1]);
     }
   });
 

@@ -413,13 +413,17 @@ export function HeadToHead({ game }: { game: GameController }) {
 }
 
 const DRIVE_DELAY_MS = 1100;
+// Matches the CSS kick animations' own duration (.6s) plus a little
+// breathing room, so the arc/spin never gets cut off mid-flight.
+const KICK_DURATION_MS = 650;
 const DRIVE_LOG_SIZE = 6;
 const YARD_NUMBERS = [10, 20, 30, 40, 50, 40, 30, 20, 10];
 
 function GoalPost() {
   return (
-    <svg className="field-goalpost" viewBox="0 0 24 48" aria-hidden="true">
-      <line x1="12" y1="48" x2="12" y2="24" stroke="#f2b73f" strokeWidth="3" strokeLinecap="round" />
+    <svg className="field-goalpost" viewBox="0 0 24 54" aria-hidden="true">
+      <rect x="9" y="46" width="6" height="8" rx="1.5" fill="#1c3a63" />
+      <line x1="12" y1="46" x2="12" y2="24" stroke="#f2b73f" strokeWidth="3" strokeLinecap="round" />
       <line x1="4" y1="24" x2="20" y2="24" stroke="#f2b73f" strokeWidth="3" strokeLinecap="round" />
       <line x1="4" y1="24" x2="4" y2="4" stroke="#f2b73f" strokeWidth="3" strokeLinecap="round" />
       <line x1="20" y1="24" x2="20" y2="4" stroke="#f2b73f" strokeWidth="3" strokeLinecap="round" />
@@ -482,13 +486,29 @@ function GameReveal({
 
     // The drive currently animating (not yet in `played`) — walked
     // through waypoint by waypoint as elapsed time moves through its
-    // slice of the current DRIVE_DELAY_MS window.
+    // slice of the current DRIVE_DELAY_MS window. A field goal's last
+    // waypoint (the kick itself) gets a reserved, fixed-length slice
+    // instead of an equal share like the walking waypoints before it —
+    // its CSS animation (KICK_DURATION_MS) needs real time on screen to
+    // finish, not a fraction of a ~200ms walking step that would cut it
+    // off mid-flight.
     const currentEvent = result.driveSequence[driveIndex];
     const currentMine = (currentEvent.team === "host") === iAmHost;
     const elapsedInDrive = elapsed - driveIndex * DRIVE_DELAY_MS;
     const driveProgress = Math.min(1, Math.max(0, elapsedInDrive / DRIVE_DELAY_MS));
     const path = deriveDrivePath(driveIndex, currentEvent);
-    const stepIdx = Math.min(path.length - 1, Math.floor(driveProgress * path.length));
+    const isFieldGoalDrive = currentEvent.points === 3 && path.length > 1;
+    let stepIdx: number;
+    if (isFieldGoalDrive) {
+      const walkBudget = DRIVE_DELAY_MS - KICK_DURATION_MS;
+      const walkWaypoints = path.length - 1;
+      stepIdx =
+        elapsedInDrive < walkBudget
+          ? Math.min(walkWaypoints - 1, Math.floor((elapsedInDrive / walkBudget) * walkWaypoints))
+          : path.length - 1;
+    } else {
+      stepIdx = Math.min(path.length - 1, Math.floor(driveProgress * path.length));
+    }
     const relativeYard = path[stepIdx];
     const isKicking = currentEvent.points === 3 && stepIdx === path.length - 1;
     // 0 is always your own goal line, 100 the opponent's, regardless of
@@ -528,9 +548,17 @@ function GameReveal({
             <GoalPost />
           </div>
           <div className="field-play">
+            <div className="field-stripes" />
             <div className="field-yardlines" />
+            <div className="field-hash top" />
+            <div className="field-hash bottom" />
             {YARD_NUMBERS.map((n, i) => (
-              <span key={i} className="field-yard-num" style={{ left: `${(i + 1) * 10}%` }}>
+              <span key={`t${i}`} className="field-yard-num top" style={{ left: `${(i + 1) * 10}%` }}>
+                {n}
+              </span>
+            ))}
+            {YARD_NUMBERS.map((n, i) => (
+              <span key={`b${i}`} className="field-yard-num bottom" style={{ left: `${(i + 1) * 10}%` }}>
                 {n}
               </span>
             ))}
@@ -538,13 +566,15 @@ function GameReveal({
               className={"field-ball-wrap" + (isKicking ? " kicking" : "")}
               style={{ left: `${absoluteYard}%`, transform: `translate(-50%, -50%)${currentMine ? "" : " scaleX(-1)"}` }}
             >
-              <svg className={"field-ball" + (isKicking ? " kicking" : "")} viewBox="0 0 24 14">
-                <ellipse cx="12" cy="7" rx="11" ry="6.2" fill="#6b4423" stroke="#3a2412" strokeWidth="1" />
-                <line x1="7.5" y1="7" x2="16.5" y2="7" stroke="#f2e9d8" strokeWidth="1" />
-                <line x1="9.5" y1="5.3" x2="9.5" y2="8.7" stroke="#f2e9d8" strokeWidth="1" />
-                <line x1="12" y1="4.8" x2="12" y2="9.2" stroke="#f2e9d8" strokeWidth="1" />
-                <line x1="14.5" y1="5.3" x2="14.5" y2="8.7" stroke="#f2e9d8" strokeWidth="1" />
-              </svg>
+              <div className={"field-ball-arc" + (isKicking ? " kicking" : "")}>
+                <svg className={"field-ball" + (isKicking ? " kicking" : "")} viewBox="0 0 24 14">
+                  <ellipse cx="12" cy="7" rx="11" ry="6.2" fill="#6b4423" stroke="#3a2412" strokeWidth="1" />
+                  <line x1="7.5" y1="7" x2="16.5" y2="7" stroke="#f2e9d8" strokeWidth="1" />
+                  <line x1="9.5" y1="5.3" x2="9.5" y2="8.7" stroke="#f2e9d8" strokeWidth="1" />
+                  <line x1="12" y1="4.8" x2="12" y2="9.2" stroke="#f2e9d8" strokeWidth="1" />
+                  <line x1="14.5" y1="5.3" x2="14.5" y2="8.7" stroke="#f2e9d8" strokeWidth="1" />
+                </svg>
+              </div>
             </div>
           </div>
           <div className="field-endzone theirs">

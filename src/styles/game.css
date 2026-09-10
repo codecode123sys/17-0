@@ -891,15 +891,17 @@
   /* Own goal line always on the left, opponent's always on the right —
      whoever actually has the ball is mirrored onto this same scale (see
      HeadToHead.tsx), so the ball visibly advances toward whichever end
-     the team driving is attacking. */
+     the team driving is attacking. Styled after a real broadcast
+     top-down field graphic: mow stripes, hash marks, numbers along both
+     edges, solid endzones. */
   .field {
     display: flex;
-    height: 74px;
+    height: 92px;
     margin-top: 18px;
     border-radius: var(--radius);
     overflow: hidden;
-    border: 1px solid var(--line);
-    background: #2f7d3f;
+    border: 2px solid #eef1ec;
+    background: #2c7a3d;
   }
   .field-endzone {
     flex: none;
@@ -907,49 +909,75 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    border-left: 2px solid rgba(255, 255, 255, .7);
+    border-right: 2px solid rgba(255, 255, 255, .7);
   }
-  .field-endzone.mine { background: #6b4f14; }
-  .field-endzone.theirs { background: #16213e; }
-  .field-goalpost { width: 20px; height: 44px; }
+  .field-endzone.mine { background: #5c4210; border-left: none; }
+  .field-endzone.theirs { background: #14213d; border-right: none; }
+  .field-goalpost { width: 20px; height: 48px; }
   .field-play {
     position: relative;
     flex: 1 1 auto;
     overflow: hidden;
   }
+  .field-stripes {
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, .05) 0 5%, transparent 5% 10%);
+  }
   .field-yardlines {
     position: absolute;
     inset: 0;
-    background-image: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(255, 255, 255, .32) calc(10% - 1px) 10%);
+    background-image: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(255, 255, 255, .4) calc(10% - 1px) 10%);
   }
+  .field-hash {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 0;
+    border-top: 2px dashed rgba(255, 255, 255, .35);
+  }
+  .field-hash.top { top: 28%; }
+  .field-hash.bottom { bottom: 28%; }
   .field-yard-num {
     position: absolute;
-    top: 5px;
     transform: translateX(-50%);
     font-family: "IBM Plex Mono", monospace;
     font-weight: 700;
-    font-size: 11px;
-    color: rgba(255, 255, 255, .55);
+    font-size: 12px;
+    color: rgba(255, 255, 255, .65);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .3);
   }
+  .field-yard-num.top { top: 6px; }
+  .field-yard-num.bottom { bottom: 6px; }
   .field-ball-wrap {
     position: absolute;
-    top: 58%;
+    top: 50%;
     width: 22px;
     height: 13px;
     /* translate + the direction-of-travel flip are set inline in JS,
        not here — they vary with which team is driving. */
-    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .4));
     transition: left .32s ease;
   }
-  .field-ball-wrap.kicking { transition: left .2s ease-out; }
-  .field-ball.kicking { animation: fieldGoalArc .5s ease-in-out; }
-  @keyframes fieldGoalArc {
-    0% { transform: translateY(0) scale(1) rotate(0); }
-    50% { transform: translateY(-16px) scale(1.25) rotate(10deg); }
-    100% { transform: translateY(0) scale(1) rotate(0); }
+  .field-ball-wrap.kicking { transition: left .6s cubic-bezier(.33, 0, .67, 1); }
+  /* Arc height is a separate layer from the position/flip wrapper above
+     and the spin below, so none of the three transforms fight each
+     other — each owns exactly one axis of the motion. */
+  .field-ball-arc { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .4)); }
+  .field-ball-arc.kicking { animation: kickArc .6s cubic-bezier(.33, 0, .67, 1); }
+  @keyframes kickArc {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-40px); }
+    100% { transform: translateY(0); }
+  }
+  .field-ball.kicking { animation: kickSpin .6s linear; }
+  @keyframes kickSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(720deg); }
   }
   @media (prefers-reduced-motion: reduce) {
     .field-ball-wrap { transition: none; }
-    .field-ball.kicking { animation: none; }
+    .field-ball-arc.kicking, .field-ball.kicking { animation: none; }
   }
   .field-caption {
     margin-top: 8px;

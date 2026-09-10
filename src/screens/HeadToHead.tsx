@@ -510,7 +510,17 @@ function GameReveal({
         <div className="field">
           <div className="field-endzone mine" />
           <div className="field-yardlines" />
-          <div className="field-ball" style={{ left: `${absoluteYard}%` }} />
+          <svg
+            className="field-ball"
+            viewBox="0 0 24 14"
+            style={{ left: `${absoluteYard}%`, transform: `translate(-50%, -50%)${currentMine ? "" : " scaleX(-1)"}` }}
+          >
+            <ellipse cx="12" cy="7" rx="11" ry="6.2" fill="#6b4423" stroke="#3a2412" strokeWidth="1" />
+            <line x1="7.5" y1="7" x2="16.5" y2="7" stroke="#f2e9d8" strokeWidth="1" />
+            <line x1="9.5" y1="5.3" x2="9.5" y2="8.7" stroke="#f2e9d8" strokeWidth="1" />
+            <line x1="12" y1="4.8" x2="12" y2="9.2" stroke="#f2e9d8" strokeWidth="1" />
+            <line x1="14.5" y1="5.3" x2="14.5" y2="8.7" stroke="#f2e9d8" strokeWidth="1" />
+          </svg>
           <div className="field-endzone theirs" />
         </div>
         <p className="field-caption">

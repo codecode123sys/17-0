@@ -917,13 +917,11 @@
   .field-ball {
     position: absolute;
     top: 50%;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #6b4423;
-    border: 1px solid rgba(0, 0, 0, .45);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, .35);
-    transform: translate(-50%, -50%);
+    width: 22px;
+    height: 13px;
+    /* transform (translate + the direction-of-travel flip) is set
+       inline in JS, not here — it varies with which team is driving. */
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .4));
     transition: left .32s ease;
   }
   @media (prefers-reduced-motion: reduce) {

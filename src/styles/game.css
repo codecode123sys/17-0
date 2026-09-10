@@ -888,6 +888,55 @@
   .drive-ticks .tick.scored.mine { box-shadow: 0 0 7px rgba(231, 164, 23, .8); }
   .drive-ticks .tick.scored.theirs { box-shadow: 0 0 7px rgba(246, 245, 236, .4); }
 
+  /* Own goal line always on the left, opponent's always on the right —
+     whoever actually has the ball is mirrored onto this same scale (see
+     HeadToHead.tsx), so the ball visibly advances toward whichever end
+     the team driving is attacking. */
+  .field {
+    position: relative;
+    height: 56px;
+    margin-top: 18px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: #2b7a41;
+    border: 1px solid var(--line);
+  }
+  .field-endzone {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 8%;
+  }
+  .field-endzone.mine { left: 0; background: rgba(231, 164, 23, .38); }
+  .field-endzone.theirs { right: 0; background: rgba(20, 20, 20, .32); }
+  .field-yardlines {
+    position: absolute;
+    inset: 0 8%;
+    background-image: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(255, 255, 255, .3) calc(10% - 1px) 10%);
+  }
+  .field-ball {
+    position: absolute;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #6b4423;
+    border: 1px solid rgba(0, 0, 0, .45);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .35);
+    transform: translate(-50%, -50%);
+    transition: left .32s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .field-ball { transition: none; }
+  }
+  .field-caption {
+    margin-top: 8px;
+    text-align: center;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
   .drive-log {
     margin-top: 16px;
     display: flex;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { REGULATION_DRIVES_PER_TEAM, simulateDriveSequence } from "./driveSim";
+import { REGULATION_DRIVES_PER_TEAM, deriveDrivePath, simulateDriveSequence } from "./driveSim";
+import type { DriveEvent } from "./driveSim";
 
 describe("simulateDriveSequence", () => {
   it("ends at exactly the given final score, for a range of real scores", () => {
@@ -93,5 +94,52 @@ describe("simulateDriveSequence", () => {
     const hostDrives = seq.filter((ev) => ev.team === "host").length;
     const guestDrives = seq.filter((ev) => ev.team === "guest").length;
     expect(hostDrives).toBe(guestDrives);
+  });
+});
+
+describe("deriveDrivePath", () => {
+  const touchdown: DriveEvent = { team: "host", label: "Touchdown", points: 7, hostScore: 7, guestScore: 0, overtime: false };
+  const fieldGoal: DriveEvent = { team: "guest", label: "Field goal", points: 3, hostScore: 0, guestScore: 3, overtime: false };
+  const safety: DriveEvent = { team: "host", label: "Safety", points: 2, hostScore: 2, guestScore: 0, overtime: false };
+  const punt: DriveEvent = { team: "guest", label: "Punt", points: 0, hostScore: 0, guestScore: 0, overtime: false };
+
+  it("is fully deterministic for the same drive index and event", () => {
+    expect(deriveDrivePath(4, touchdown)).toEqual(deriveDrivePath(4, touchdown));
+    expect(deriveDrivePath(4, touchdown)).not.toEqual(deriveDrivePath(5, touchdown));
+  });
+
+  it("a touchdown always ends at the goal line (100)", () => {
+    for (let i = 0; i < 10; i++) expect(deriveDrivePath(i, touchdown).at(-1)).toBe(100);
+  });
+
+  it("a field goal stalls out short of the goal line", () => {
+    for (let i = 0; i < 10; i++) {
+      const end = deriveDrivePath(i, fieldGoal).at(-1)!;
+      expect(end).toBeGreaterThanOrEqual(65);
+      expect(end).toBeLessThan(100);
+    }
+  });
+
+  it("a safety ends deep in the driving team's own territory", () => {
+    for (let i = 0; i < 10; i++) expect(deriveDrivePath(i, safety).at(-1)).toBeLessThanOrEqual(5);
+  });
+
+  it("a punt stalls out around midfield, never reaching either goal line", () => {
+    for (let i = 0; i < 10; i++) {
+      const end = deriveDrivePath(i, punt).at(-1)!;
+      expect(end).toBeGreaterThan(0);
+      expect(end).toBeLessThan(100);
+    }
+  });
+
+  it("every waypoint stays within the field (0-100)", () => {
+    for (const ev of [touchdown, fieldGoal, safety, punt]) {
+      for (let i = 0; i < 10; i++) {
+        for (const yard of deriveDrivePath(i, ev)) {
+          expect(yard).toBeGreaterThanOrEqual(0);
+          expect(yard).toBeLessThanOrEqual(100);
+        }
+      }
+    }
   });
 });

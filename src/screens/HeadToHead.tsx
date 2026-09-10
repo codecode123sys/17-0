@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import type { FilledSlots } from "../engine/draft";
 import { SLOTS } from "../engine/draft";
-import { REGULATION_DRIVES_PER_TEAM } from "../engine/driveSim";
+import { REGULATION_DRIVES_PER_TEAM, deriveDrivePath } from "../engine/driveSim";
 import { badgeFor } from "../engine/visuals";
 import { firebaseConfigured } from "../lib/firebaseConfig";
 import { getUid } from "../lib/firebase";
@@ -467,6 +467,23 @@ function GameReveal({
     const driveLabel = inOvertime
       ? `Overtime · drive ${played.length - regulationTotal}`
       : `Drive ${Math.min(played.length + 1, regulationTotal)} of ${regulationTotal}`;
+
+    // The drive currently animating (not yet in `played`) — walked
+    // through waypoint by waypoint as elapsed time moves through its
+    // slice of the current DRIVE_DELAY_MS window.
+    const currentEvent = result.driveSequence[driveIndex];
+    const currentMine = (currentEvent.team === "host") === iAmHost;
+    const elapsedInDrive = elapsed - driveIndex * DRIVE_DELAY_MS;
+    const driveProgress = Math.min(1, Math.max(0, elapsedInDrive / DRIVE_DELAY_MS));
+    const path = deriveDrivePath(driveIndex, currentEvent);
+    const relativeYard = path[Math.min(path.length - 1, Math.floor(driveProgress * path.length))];
+    // 0 is always your own goal line, 100 the opponent's, regardless of
+    // who's actually driving — their drives are mirrored onto the same
+    // scale so the ball always visibly advances toward whichever end
+    // the team with the ball is attacking.
+    const absoluteYard = currentMine ? relativeYard : 100 - relativeYard;
+    const yardLabel = relativeYard <= 50 ? `own ${relativeYard}` : `opp ${100 - relativeYard}`;
+
     return (
       <section className="view">
         <div className="result-board">
@@ -489,6 +506,17 @@ function GameReveal({
             })}
           </div>
         </div>
+
+        <div className="field">
+          <div className="field-endzone mine" />
+          <div className="field-yardlines" />
+          <div className="field-ball" style={{ left: `${absoluteYard}%` }} />
+          <div className="field-endzone theirs" />
+        </div>
+        <p className="field-caption">
+          {currentMine ? "You" : otherName} driving &mdash; ball on the {yardLabel}
+        </p>
+
         <div className="drive-log">
           {recent.map((ev, i) => {
             const mine = (ev.team === "host") === iAmHost;

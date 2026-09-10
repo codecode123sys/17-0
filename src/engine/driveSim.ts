@@ -122,3 +122,43 @@ export function simulateDriveSequence(hostScore: number, guestScore: number): Dr
     return { team: ev.team, label: labelFor(ev.points), points: ev.points, hostScore: host, guestScore: guest, overtime: i >= regulation.length };
   });
 }
+
+function mulberry32(seed: number): () => number {
+  let a = seed;
+  return function () {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** A plausible yard-by-yard path for one drive, 0-100 in the driving
+ * team's own attacking direction (0 = their own goal line, 100 = the
+ * opponent's) — for the live field animation, not anything that affects
+ * score or outcome. Seeded off the drive's own index and outcome rather
+ * than Math.random, so both players' clients — each deriving this
+ * independently from the same shared driveSequence, never sent over the
+ * wire itself — animate the identical path instead of two different
+ * ones for what's supposed to be one shared simulation. */
+export function deriveDrivePath(driveIndex: number, ev: DriveEvent): number[] {
+  const rand = mulberry32(driveIndex * 7919 + ev.points * 31 + (ev.team === "host" ? 1 : 0) + 1);
+  const start = 15 + Math.floor(rand() * 20); // own 15-34
+  let end: number;
+  if (ev.points === 2) end = 1; // safety — tackled behind their own goal line
+  else if (ev.points === 3) end = 65 + Math.floor(rand() * 18); // stalls in field-goal range
+  else if (ev.points >= 6) end = 100; // touchdown
+  else end = 38 + Math.floor(rand() * 27); // drive stalls out, punt/turnover
+
+  const steps = 3 + Math.floor(rand() * 3); // 3-5 waypoints, inclusive of start/end
+  const path: number[] = [start];
+  for (let i = 1; i < steps - 1; i++) {
+    const t = i / (steps - 1);
+    const base = start + (end - start) * t;
+    const jitter = (rand() - 0.5) * 10;
+    path.push(Math.max(0, Math.min(100, Math.round(base + jitter))));
+  }
+  path.push(end);
+  return path;
+}

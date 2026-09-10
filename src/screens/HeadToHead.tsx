@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import type { FilledSlots } from "../engine/draft";
 import { SLOTS } from "../engine/draft";
+import { REGULATION_DRIVES_PER_TEAM } from "../engine/driveSim";
 import { badgeFor } from "../engine/visuals";
 import { firebaseConfigured } from "../lib/firebaseConfig";
 import { getUid } from "../lib/firebase";
@@ -460,6 +461,10 @@ function GameReveal({
     const liveOpp = iAmHost ? liveGuest : liveHost;
     const inOvertime = played.length > 0 && played[played.length - 1].overtime;
     const recent = played.slice(-DRIVE_LOG_SIZE);
+    const regulationTotal = REGULATION_DRIVES_PER_TEAM * 2;
+    const driveLabel = inOvertime
+      ? `Overtime · drive ${played.length - regulationTotal}`
+      : `Drive ${Math.min(played.length + 1, regulationTotal)} of ${regulationTotal}`;
     return (
       <section className="view">
         <div className="result-board">
@@ -468,6 +473,7 @@ function GameReveal({
             {liveMe}&ndash;{liveOpp}
           </div>
           <div className="sub">live score &mdash; you vs. {otherName}</div>
+          <div className="sub">{driveLabel}</div>
         </div>
         <div className="drive-log">
           {recent.map((ev, i) => {

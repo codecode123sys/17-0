@@ -337,11 +337,7 @@ export function HeadToHead({ game }: { game: GameController }) {
   );
 }
 
-function prefersReducedMotion(): boolean {
-  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
-const DRIVE_DELAY_MS = 1800;
+const DRIVE_DELAY_MS = 1100;
 const DRIVE_LOG_SIZE = 6;
 
 function GameReveal({
@@ -366,8 +362,13 @@ function GameReveal({
   const finished = driveIndex >= sequence.length;
 
   useEffect(() => {
+    // Deliberately ignores prefers-reduced-motion: this timer paces
+    // content the player is meant to actually read (the score/play log),
+    // not decorative motion — reduced motion still applies to the drive
+    // rows' own fade-in transform (see .drive-row's CSS), just not to
+    // whether the game plays out at a readable pace at all.
     if (finished) return;
-    const id = window.setTimeout(() => setDriveIndex((i) => i + 1), prefersReducedMotion() ? 0 : DRIVE_DELAY_MS);
+    const id = window.setTimeout(() => setDriveIndex((i) => i + 1), DRIVE_DELAY_MS);
     return () => window.clearTimeout(id);
   }, [driveIndex, finished]);
 

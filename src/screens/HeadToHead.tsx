@@ -53,12 +53,8 @@ export function HeadToHead({ game }: { game: GameController }) {
     return () => unsubRef.current?.();
   }, [code]);
 
-  // Once both players have voted to run it back, a fresh room appears
-  // here (see voteRematch) — both clients navigate themselves into it
-  // the moment they see it, whichever of them actually created it.
-  useEffect(() => {
-    const rematchCode = match?.rematchCode;
-    if (!rematchCode || rematchCode === code) return;
+  function handleJoinRematch(rematchCode: string) {
+    if (rematchCode === code) return;
     joinRoom(rematchCode, getPlayerName() || "Anonymous")
       .catch(() => {
         /* already the host/guest of it — nothing to do */
@@ -67,6 +63,15 @@ export function HeadToHead({ game }: { game: GameController }) {
         setMatch(null);
         setCode(rematchCode);
       });
+  }
+
+  // Once both players have voted to run it back, a fresh room appears
+  // here (see voteRematch) — both clients navigate themselves into it
+  // automatically the moment they see it, whichever of them actually
+  // created it. The "Rematch ready" screen's own "Join now" button below
+  // calls the same handleJoinRematch, in case this ever doesn't fire.
+  useEffect(() => {
+    if (match?.rematchCode) handleJoinRematch(match.rematchCode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [match?.rematchCode, code]);
 
@@ -253,6 +258,26 @@ export function HeadToHead({ game }: { game: GameController }) {
 
   // ---------- done: simulate the drives, then reveal ----------
   if (match.status === "done" && match.result) {
+    // Both players have voted to run it back and the fresh room exists —
+    // the effect above is already navigating automatically, but show a
+    // real button too rather than leaving this to a silent background
+    // process with nothing visible to click if it's ever slow to land.
+    const rematchCode = match.rematchCode;
+    if (rematchCode) {
+      return (
+        <section className="view">
+          <div className="result-board">
+            <div className="verdict">Rematch ready</div>
+            <div className="sub">Starting your next match&hellip;</div>
+          </div>
+          <div className="result-actions">
+            <button className="btn" onClick={() => handleJoinRematch(rematchCode)}>
+              Join now
+            </button>
+          </div>
+        </section>
+      );
+    }
     return (
       <GameReveal
         result={match.result}

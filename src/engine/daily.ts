@@ -62,10 +62,17 @@ function coveredSlotKeys(board: DailyTile[]): Set<string> {
 }
 
 /** One attempt at a board for the given seed. Prefers franchises deep
- * enough to offer real choice — `teamsForEra`'s own MIN_BOARD preference,
- * same one the classic draft's reel uses — and never repeats the exact
- * same team+era tile twice, so every tile is both distinct and (almost
- * always) has more than one real option on it. */
+ * enough to offer real choice — `teamsForEra`'s own MIN_BOARD (3+ total
+ * players in that era) preference, same one the classic draft's reel
+ * uses — and never repeats the exact same team+era tile twice.
+ *
+ * Picking the era first and only then checking for a deep team left it
+ * possible to land on an era whose only deep teams were already used
+ * earlier in this same board (eras get reused up to ERA_CAP times), and
+ * fall all the way back to a 1-2-player team. Instead, each slot first
+ * narrows to the eras that still have an unused deep team at all, and
+ * only picks among the rest if truly none do — which shouldn't happen
+ * given how many eras and franchises exist relative to the 8 slots. */
 function buildBoardAttempt(dateKey: string, attempt: number): DailyTile[] {
   const rand = mulberry32(hashString(`${dateKey}:${attempt}`));
   const eraCounts = new Map<Era, number>();
@@ -73,7 +80,8 @@ function buildBoardAttempt(dateKey: string, attempt: number): DailyTile[] {
   const board: DailyTile[] = [];
   for (let i = 0; i < SLOTS.length; i++) {
     const eraChoices = ERAS.filter((e) => (eraCounts.get(e) ?? 0) < ERA_CAP);
-    const era = pick(eraChoices, rand);
+    const erasWithDeepTeam = eraChoices.filter((e) => teamsForEra(e, {}).some((t) => !usedPairs.has(`${e}|${t}`)));
+    const era = pick(erasWithDeepTeam.length ? erasWithDeepTeam : eraChoices, rand);
 
     const deep = teamsForEra(era, {}).filter((t) => !usedPairs.has(`${era}|${t}`));
     const any = teamsPresentInEra(era).filter((t) => !usedPairs.has(`${era}|${t}`));

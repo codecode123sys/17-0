@@ -49,21 +49,22 @@ describe("generateDailyBoard", () => {
     }
   });
 
-  it("prefers franchises deep enough to offer real choice, not just one player", () => {
-    // Not every tile can be guaranteed multiple players (some eras are
-    // thinner than others), but the vast majority should be, now that
-    // board-building prefers the same MIN_BOARD-deep franchises the
-    // classic draft's reel prefers.
-    let deepTiles = 0;
+  it("only ever picks franchises with 3+ players (real choice), never a 1-2 player team", () => {
+    // Picking the era first and only then checking depth could land on
+    // an era whose deep teams were already used earlier in the same
+    // board, falling back to a thin (1-2 player) team — fixed by
+    // preferring eras that still have an unused deep team at all. Sample
+    // many dates since this is exactly the kind of thing that could
+    // regress only occasionally.
     let totalTiles = 0;
-    for (const date of ["2026-01-01", "2026-04-12", "2026-09-08", "2026-12-25", "2026-03-15", "2026-06-30"]) {
-      const board = generateDailyBoard(date);
+    for (let i = 0; i < 100; i++) {
+      const board = generateDailyBoard(`2026-01-01:${i}`);
       for (const tile of board) {
         totalTiles++;
-        if (tilePlayers(tile).length >= 2) deepTiles++;
+        expect(tilePlayers(tile).length).toBeGreaterThanOrEqual(3);
       }
     }
-    expect(deepTiles / totalTiles).toBeGreaterThan(0.9);
+    expect(totalTiles).toBe(800);
   });
 });
 

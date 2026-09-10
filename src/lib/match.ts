@@ -212,8 +212,14 @@ export function effectiveTile(match: Pick<MatchDoc, "board" | "swaps">, uid: str
 }
 
 function randomTeamEraExcluding(exclude: Set<string>): { era: Era; team: string } | null {
+  // Prefer an era that still has an unused deep (3+ player) team at all,
+  // so a skip's replacement doesn't land you on a 1-player team just
+  // because the era it happened to roll first was already tapped out —
+  // same fix as generateDailyBoard's own era selection.
+  const erasWithDeep = ERAS.filter((era) => teamsForEra(era, {}).some((t) => !exclude.has(`${era}|${t}`)));
+  const eraPool = erasWithDeep.length ? erasWithDeep : ERAS;
   for (let attempt = 0; attempt < 60; attempt++) {
-    const era = ERAS[Math.floor(Math.random() * ERAS.length)];
+    const era = eraPool[Math.floor(Math.random() * eraPool.length)];
     const deep = teamsForEra(era, {}).filter((t) => !exclude.has(`${era}|${t}`));
     const any = teamsPresentInEra(era).filter((t) => !exclude.has(`${era}|${t}`));
     const pool = deep.length ? deep : any;

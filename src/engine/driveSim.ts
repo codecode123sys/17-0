@@ -49,27 +49,55 @@ function decomposeScore(total: number): number[] {
   return plays;
 }
 
+interface Possession {
+  team: DriveTeam;
+  points: number;
+}
+
+/** Alternates two equal-length lists possession by possession — real
+ * drives trade off one team at a time. */
+function alternate(a: Possession[], b: Possession[], aFirst: boolean): Possession[] {
+  const [first, second] = aFirst ? [a, b] : [b, a];
+  const out: Possession[] = [];
+  for (let i = 0; i < first.length; i++) {
+    out.push(first[i]);
+    out.push(second[i]);
+  }
+  return out;
+}
+
 /** A plausible drive-by-drive narration of a game that ends at exactly
  * `hostScore`-`guestScore` — the real outcome, already decided by
  * playGame, is never in question here; this only dramatizes how the
  * score plausibly got there, drive by drive, for the live-score
- * animation. A handful of non-scoring possessions are mixed in purely
- * for pacing, then everything is shuffled together so scoring doesn't
- * strictly alternate. */
+ * animation. Both teams get the same number of total drives — whichever
+ * team needed fewer scoring plays gets padded out with more non-scoring
+ * possessions, not just a handful for everyone — specifically so a
+ * lopsided score doesn't turn into a long unbroken run of one team's
+ * drives; the two teams' drives are shuffled internally, then
+ * interleaved so possession strictly alternates, coin-tossed for who
+ * gets the ball first. */
 export function simulateDriveSequence(hostScore: number, guestScore: number): DriveEvent[] {
-  const scoring: { team: DriveTeam; points: number }[] = [
-    ...decomposeScore(hostScore).map((points) => ({ team: "host" as const, points })),
-    ...decomposeScore(guestScore).map((points) => ({ team: "guest" as const, points })),
-  ];
-  const puntCount = 4 + Math.floor(Math.random() * 5); // 4-8 filler possessions
-  const punts = Array.from({ length: puntCount }, (_, i) => ({
-    team: (i % 2 === 0 ? "host" : "guest") as DriveTeam,
-    points: 0,
+  const hostScoring = decomposeScore(hostScore);
+  const guestScoring = decomposeScore(guestScore);
+
+  const extraRounds = 2 + Math.floor(Math.random() * 3); // 2-4 punt-only rounds, for pacing
+  const totalDrives = Math.max(hostScoring.length, guestScoring.length) + extraRounds;
+  const hostPunts = totalDrives - hostScoring.length;
+  const guestPunts = totalDrives - guestScoring.length;
+
+  const hostDrives = shuffle([...hostScoring, ...Array(hostPunts).fill(0)]).map((points) => ({
+    team: "host" as const,
+    points,
+  }));
+  const guestDrives = shuffle([...guestScoring, ...Array(guestPunts).fill(0)]).map((points) => ({
+    team: "guest" as const,
+    points,
   }));
 
   let host = 0;
   let guest = 0;
-  return shuffle([...scoring, ...punts]).map((ev) => {
+  return alternate(hostDrives, guestDrives, Math.random() < 0.5).map((ev) => {
     if (ev.team === "host") host += ev.points;
     else guest += ev.points;
     const label = ev.points === 0 ? PUNT_LABELS[Math.floor(Math.random() * PUNT_LABELS.length)] : SCORE_LABELS[ev.points];

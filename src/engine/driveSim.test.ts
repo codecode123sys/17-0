@@ -29,9 +29,34 @@ describe("simulateDriveSequence", () => {
     }
   });
 
-  it("includes at least a few non-scoring possessions for pacing", () => {
+  it("includes at least a couple of non-scoring possessions for pacing", () => {
     const seq = simulateDriveSequence(21, 14);
     const punts = seq.filter((ev) => ev.points === 0);
-    expect(punts.length).toBeGreaterThanOrEqual(4);
+    expect(punts.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("strictly alternates possession, even with a lopsided score", () => {
+    // Lopsided scores are exactly the case that would otherwise turn
+    // into a long unbroken run of the higher-scoring team's drives once
+    // the other side's scoring plays ran out.
+    for (const [host, guest] of [
+      [24, 17],
+      [10, 10],
+      [45, 3],
+      [7, 59],
+      [59, 3],
+    ]) {
+      const seq = simulateDriveSequence(host, guest);
+      for (let i = 1; i < seq.length; i++) {
+        expect(seq[i].team).not.toBe(seq[i - 1].team);
+      }
+    }
+  });
+
+  it("gives both teams the exact same number of drives", () => {
+    const seq = simulateDriveSequence(38, 6);
+    const hostDrives = seq.filter((ev) => ev.team === "host").length;
+    const guestDrives = seq.filter((ev) => ev.team === "guest").length;
+    expect(hostDrives).toBe(guestDrives);
   });
 });

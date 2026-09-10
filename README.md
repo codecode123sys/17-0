@@ -278,9 +278,17 @@ player with no conflict. Each player also gets one personal skip for the
 whole match — reroll whichever round you're currently facing into a new
 random matchup, just for you; your opponent's view of that round is
 unaffected. Once both rosters are full, the engine simulates one game
-between the two rosters to declare a winner. Rooms are joined by a short
+between the two rosters — computed once, server-side, and shared by both
+clients (see `engine/driveSim.ts`) so both players watch the identical
+drive-by-drive animation (alternating possession, a live score) in sync,
+timed off a shared timestamp rather than each client's own clock. The
+reveal shows each player's OVR and which roster was stronger on paper,
+separate from who actually won the simulated game. Afterward, either
+player can vote to run it back — once both have, a fresh room is set up
+automatically with the same two players. Rooms are joined by a short
 code or invite link (`?join=CODE`), no accounts. See `src/lib/match.ts`
-for the room/draft/skip logic and `src/screens/HeadToHead.tsx` for the UI.
+for the room/draft/skip/rematch logic and `src/screens/HeadToHead.tsx`
+for the UI.
 
 This needs a live backend, unlike everything else in the app — it's the
 one feature that genuinely can't work from localStorage alone, since two

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import type { FilledSlots } from "../engine/draft";
 import { SLOTS } from "../engine/draft";
-import { simulateDriveSequence } from "../engine/driveSim";
 import { badgeFor } from "../engine/visuals";
 import { firebaseConfigured } from "../lib/firebaseConfig";
 import { getUid } from "../lib/firebase";
@@ -17,6 +16,7 @@ import {
   rosterFromIds,
   subscribeRoom,
   useSkip,
+  voteRematch,
 } from "../lib/match";
 import type { MatchDoc, MatchResult } from "../lib/match";
 import { getPlayerName } from "../lib/playerName";
@@ -52,6 +52,23 @@ export function HeadToHead({ game }: { game: GameController }) {
     unsubRef.current = subscribeRoom(code, setMatch);
     return () => unsubRef.current?.();
   }, [code]);
+
+  // Once both players have voted to run it back, a fresh room appears
+  // here (see voteRematch) — both clients navigate themselves into it
+  // the moment they see it, whichever of them actually created it.
+  useEffect(() => {
+    const rematchCode = match?.rematchCode;
+    if (!rematchCode || rematchCode === code) return;
+    joinRoom(rematchCode, getPlayerName() || "Anonymous")
+      .catch(() => {
+        /* already the host/guest of it — nothing to do */
+      })
+      .finally(() => {
+        setMatch(null);
+        setCode(rematchCode);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match?.rematchCode, code]);
 
   if (!firebaseConfigured()) {
     return (
@@ -136,6 +153,16 @@ export function HeadToHead({ game }: { game: GameController }) {
       await useSkip(code);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't use your skip.");
+    }
+  }
+
+  async function handleVoteRematch() {
+    if (!code) return;
+    setError("");
+    try {
+      await voteRematch(code, getPlayerName() || "Anonymous");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't vote to run it back.");
     }
   }
 
@@ -233,7 +260,10 @@ export function HeadToHead({ game }: { game: GameController }) {
         otherName={otherName}
         myFilled={myFilled}
         oppFilled={oppFilled}
-        onRematch={handleCreate}
+        rematchVotes={match.rematchVotes}
+        myUid={uid ?? ""}
+        onVoteRematch={handleVoteRematch}
+        onNewMatch={handleCreate}
         onHome={goHome}
       />
     );
@@ -346,7 +376,10 @@ function GameReveal({
   otherName,
   myFilled,
   oppFilled,
-  onRematch,
+  rematchVotes,
+  myUid,
+  onVoteRematch,
+  onNewMatch,
   onHome,
 }: {
   result: MatchResult;
@@ -354,26 +387,29 @@ function GameReveal({
   otherName: string;
   myFilled: FilledSlots;
   oppFilled: FilledSlots;
-  onRematch: () => void;
+  rematchVotes: string[];
+  myUid: string;
+  onVoteRematch: () => void;
+  onNewMatch: () => void;
   onHome: () => void;
 }) {
-  const [sequence] = useState(() => simulateDriveSequence(result.hostScore, result.guestScore));
-  const [driveIndex, setDriveIndex] = useState(0);
-  const finished = driveIndex >= sequence.length;
+  // Timed off result.revealStartedAt (set once, server-side, by whichever
+  // pick finalized the match) rather than a local per-client timer, so
+  // both players watch the identical sequence in sync regardless of
+  // exactly when each of their screens happened to render "done".
+  const [now, setNow] = useState(() => Date.now());
+  const elapsed = Math.max(0, now - result.revealStartedAt);
+  const driveIndex = Math.min(result.driveSequence.length, Math.floor(elapsed / DRIVE_DELAY_MS));
+  const finished = driveIndex >= result.driveSequence.length;
 
   useEffect(() => {
-    // Deliberately ignores prefers-reduced-motion: this timer paces
-    // content the player is meant to actually read (the score/play log),
-    // not decorative motion — reduced motion still applies to the drive
-    // rows' own fade-in transform (see .drive-row's CSS), just not to
-    // whether the game plays out at a readable pace at all.
     if (finished) return;
-    const id = window.setTimeout(() => setDriveIndex((i) => i + 1), DRIVE_DELAY_MS);
-    return () => window.clearTimeout(id);
-  }, [driveIndex, finished]);
+    const id = window.setInterval(() => setNow(Date.now()), 200);
+    return () => window.clearInterval(id);
+  }, [finished]);
 
   if (!finished) {
-    const played = sequence.slice(0, driveIndex);
+    const played = result.driveSequence.slice(0, driveIndex);
     const liveHost = played.length ? played[played.length - 1].hostScore : 0;
     const liveGuest = played.length ? played[played.length - 1].guestScore : 0;
     const liveMe = iAmHost ? liveHost : liveGuest;
@@ -410,7 +446,10 @@ function GameReveal({
       otherName={otherName}
       myFilled={myFilled}
       oppFilled={oppFilled}
-      onRematch={onRematch}
+      rematchVotes={rematchVotes}
+      myUid={myUid}
+      onVoteRematch={onVoteRematch}
+      onNewMatch={onNewMatch}
       onHome={onHome}
     />
   );
@@ -422,7 +461,10 @@ function FinalReveal({
   otherName,
   myFilled,
   oppFilled,
-  onRematch,
+  rematchVotes,
+  myUid,
+  onVoteRematch,
+  onNewMatch,
   onHome,
 }: {
   result: MatchResult;
@@ -430,7 +472,10 @@ function FinalReveal({
   otherName: string;
   myFilled: FilledSlots;
   oppFilled: FilledSlots;
-  onRematch: () => void;
+  rematchVotes: string[];
+  myUid: string;
+  onVoteRematch: () => void;
+  onNewMatch: () => void;
   onHome: () => void;
 }) {
   const myScore = iAmHost ? result.hostScore : result.guestScore;
@@ -445,6 +490,16 @@ function FinalReveal({
       : myStrength > oppStrength
         ? "You had the better team on paper."
         : `${otherName} had the better team on paper.`;
+
+  const iVoted = rematchVotes.includes(myUid);
+  const oppVoted = rematchVotes.some((v) => v !== myUid);
+  const rematchLabel = iVoted
+    ? oppVoted
+      ? "Starting a rematch…"
+      : `Waiting for ${otherName}…`
+    : oppVoted
+      ? `${otherName} wants a rematch — run it back?`
+      : "Run it back";
 
   return (
     <section className="view">
@@ -468,11 +523,13 @@ function FinalReveal({
               <div className="compare-pos">{slot.label}</div>
               <div className="compare-side">
                 <span className="lbl">You</span>
-                <span className="nm">{mine ? `${mine.name} · OVR ${mine.ovr}` : "—"}</span>
+                <span className="nm">{mine ? mine.name : "—"}</span>
+                {mine && <span className="tag">OVR {mine.ovr}</span>}
               </div>
               <div className="compare-side">
                 <span className="lbl">{otherName}</span>
-                <span className="nm">{theirs ? `${theirs.name} · OVR ${theirs.ovr}` : "—"}</span>
+                <span className="nm">{theirs ? theirs.name : "—"}</span>
+                {theirs && <span className="tag">OVR {theirs.ovr}</span>}
               </div>
             </div>
           );
@@ -480,7 +537,10 @@ function FinalReveal({
       </div>
 
       <div className="result-actions">
-        <button className="btn" onClick={onRematch}>
+        <button className="btn" onClick={onVoteRematch} disabled={iVoted}>
+          {rematchLabel}
+        </button>
+        <button className="btn ghost" onClick={onNewMatch}>
           New match
         </button>
         <button className="btn ghost" onClick={onHome}>

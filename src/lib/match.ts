@@ -8,6 +8,7 @@ import {
   query,
   runTransaction,
   setDoc,
+  updateDoc,
   where,
 } from "firebase/firestore";
 import { PLAYERS } from "../data/players";
@@ -17,6 +18,8 @@ import type { FilledSlots } from "../engine/draft";
 import { generateDailyBoard, hasPerfectMatching, tileCanFillSlot, tilePlayers } from "../engine/daily";
 import type { DailyTile } from "../engine/daily";
 import { playGame } from "../engine/season";
+import { simulateDriveSequence } from "../engine/driveSim";
+import type { DriveEvent } from "../engine/driveSim";
 import { getDb, getUid } from "./firebase";
 
 export type MatchTile = DailyTile;
@@ -27,6 +30,15 @@ export interface MatchResult {
   guestStrength: number;
   hostScore: number;
   guestScore: number;
+  // Computed once, here, by whichever pick finalizes the match — never
+  // regenerated per-client — so both players watch the identical
+  // drive-by-drive narration rather than each fabricating their own.
+  driveSequence: DriveEvent[];
+  // Wall-clock time (Date.now(), from whichever client's pick finalized
+  // the match) both players' local playback is timed relative to, so
+  // the animation is in sync rather than starting whenever each
+  // player's own screen happens to render "done".
+  revealStartedAt: number;
 }
 
 export interface SwapTile {
@@ -55,6 +67,13 @@ export interface MatchDoc {
   readyUids: string[];
   result: MatchResult | null;
   quickMatch: boolean;
+  // Mutual "run it back": uids who've asked for a rematch with this same
+  // opponent. Once both have, whichever vote got there second creates a
+  // fresh room (both players pre-filled, so it skips straight to
+  // active) and records its code here — both clients watch this field
+  // and navigate themselves into that room once it appears.
+  rematchVotes: string[];
+  rematchCode: string | null;
 }
 
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L
@@ -90,6 +109,8 @@ export async function createRoom(name: string, quickMatch = false): Promise<stri
       readyUids: [],
       result: null,
       quickMatch,
+      rematchVotes: [],
+      rematchCode: null,
     };
     await setDoc(ref, match);
     return code;
@@ -307,12 +328,90 @@ export async function draftPick(code: string, slotKey: string, playerId: number)
         guestStrength,
         hostScore: game.mp,
         guestScore: game.op,
+        driveSequence: simulateDriveSequence(game.mp, game.op),
+        revealStartedAt: Date.now(),
       };
       update.status = "done";
       update.result = result;
     }
 
     tx.update(ref, update);
+  });
+}
+
+/** Creates a fresh room with both players already known — skips the
+ *  usual solo "waiting" stage entirely, since a rematch has no one left
+ *  to invite. The create is written with status 'waiting' first (the
+ *  only shape the security rules' create clause allows) and then flipped
+ *  to 'active' in a second write, which the update clause allows for
+ *  whoever just created it (they're its hostUid). */
+async function createRematchRoom(myUid: string, myName: string, otherUid: string, otherName: string): Promise<string> {
+  const db = getDb();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = randomCode();
+    const ref = doc(db, "matches", code);
+    const existing = await getDoc(ref);
+    if (existing.exists()) continue;
+    const match: MatchDoc = {
+      status: "waiting",
+      createdAt: Date.now(),
+      hostUid: myUid,
+      hostName: myName || "Anonymous",
+      guestUid: otherUid,
+      guestName: otherName || "Anonymous",
+      board: generateDailyBoard(`${code}:${Date.now()}:${Math.random()}`),
+      rosters: { [myUid]: {}, [otherUid]: {} },
+      swaps: {},
+      readyUids: [],
+      result: null,
+      quickMatch: false,
+      rematchVotes: [],
+      rematchCode: null,
+    };
+    await setDoc(ref, match);
+    await updateDoc(ref, { status: "active" });
+    return code;
+  }
+  throw new Error("Couldn't set up a rematch — try again.");
+}
+
+/** Votes to run it back with the same opponent. Once both players have
+ *  voted, a fresh room is created automatically (see createRematchRoom)
+ *  and its code is recorded on this match doc — both clients watch
+ *  rematchCode via their existing subscribeRoom listener and navigate
+ *  themselves into it, so nobody has to share a new code manually for a
+ *  rematch. If both players happen to vote at nearly the same moment,
+ *  both may create a room, but the guarded second write below ensures
+ *  only one rematchCode ever sticks — the loser's room is simply never
+ *  joined by anyone (an orphan, same as any other abandoned room). */
+export async function voteRematch(code: string, name: string): Promise<void> {
+  const uid = await getUid();
+  const db = getDb();
+  const ref = doc(db, "matches", code.toUpperCase());
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error("This match no longer exists.");
+    const match = snap.data() as MatchDoc;
+    if (match.status !== "done") throw new Error("This match isn't finished yet.");
+    if (match.rematchVotes.includes(uid)) return;
+    tx.update(ref, { rematchVotes: [...match.rematchVotes, uid] });
+  });
+
+  const fresh = await getDoc(ref);
+  const match = fresh.data() as MatchDoc | undefined;
+  if (!match || match.rematchCode || match.rematchVotes.length < 2 || !match.hostUid || !match.guestUid) return;
+
+  const otherUid = match.hostUid === uid ? match.guestUid : match.hostUid;
+  const otherName = (match.hostUid === uid ? match.guestName : match.hostName) ?? "";
+  const newCode = await createRematchRoom(uid, name, otherUid, otherName);
+
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) return;
+    const m = snap.data() as MatchDoc;
+    if (m.rematchCode) return; // someone else already won this race
+    tx.update(ref, { rematchCode: newCode });
   });
 }
 

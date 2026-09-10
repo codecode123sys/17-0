@@ -379,15 +379,27 @@ async function createRematchRoom(myUid: string, myName: string, otherUid: string
  *  voted, a fresh room is created automatically (see createRematchRoom)
  *  and its code is recorded on this match doc — both clients watch
  *  rematchCode via their existing subscribeRoom listener and navigate
- *  themselves into it, so nobody has to share a new code manually for a
- *  rematch. If both players happen to vote at nearly the same moment,
- *  both may create a room, but the guarded second write below ensures
- *  only one rematchCode ever sticks — the loser's room is simply never
- *  joined by anyone (an orphan, same as any other abandoned room). */
+ *  themselves into it, so nobody has to share a new code manually.
+ *
+ *  Whether *this* call is the one that creates the room is decided
+ *  entirely from inside the vote transaction itself, not from a
+ *  separate read afterward — Firestore serializes conflicting
+ *  transactions on the same document, so if both players vote at
+ *  nearly the same moment, one of the two transactions is guaranteed to
+ *  be retried against the other's already-committed vote and see the
+ *  count reach two from within itself. Deciding this from a follow-up
+ *  read instead (the earlier version of this function) had a real race:
+ *  both clients' post-vote reads could each land in the narrow window
+ *  where they only saw their own vote, so neither ever created the
+ *  room and both got stuck waiting on each other forever. */
 export async function voteRematch(code: string, name: string): Promise<void> {
   const uid = await getUid();
   const db = getDb();
   const ref = doc(db, "matches", code.toUpperCase());
+
+  let iShouldCreate = false;
+  let otherUid = "";
+  let otherName = "";
 
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
@@ -395,22 +407,25 @@ export async function voteRematch(code: string, name: string): Promise<void> {
     const match = snap.data() as MatchDoc;
     if (match.status !== "done") throw new Error("This match isn't finished yet.");
     if (match.rematchVotes.includes(uid)) return;
-    tx.update(ref, { rematchVotes: [...match.rematchVotes, uid] });
+
+    const votes = [...match.rematchVotes, uid];
+    tx.update(ref, { rematchVotes: votes });
+
+    if (votes.length >= 2 && !match.rematchCode && match.hostUid && match.guestUid) {
+      iShouldCreate = true;
+      otherUid = match.hostUid === uid ? match.guestUid : match.hostUid;
+      otherName = (match.hostUid === uid ? match.guestName : match.hostName) ?? "";
+    }
   });
 
-  const fresh = await getDoc(ref);
-  const match = fresh.data() as MatchDoc | undefined;
-  if (!match || match.rematchCode || match.rematchVotes.length < 2 || !match.hostUid || !match.guestUid) return;
+  if (!iShouldCreate) return;
 
-  const otherUid = match.hostUid === uid ? match.guestUid : match.hostUid;
-  const otherName = (match.hostUid === uid ? match.guestName : match.hostName) ?? "";
   const newCode = await createRematchRoom(uid, name, otherUid, otherName);
-
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists()) return;
     const m = snap.data() as MatchDoc;
-    if (m.rematchCode) return; // someone else already won this race
+    if (m.rematchCode) return; // shouldn't happen now, but stay defensive
     tx.update(ref, { rematchCode: newCode });
   });
 }

@@ -150,19 +150,35 @@ export async function joinRoom(code: string, name: string): Promise<void> {
 
 const QUICK_MATCH_STALE_MS = 5 * 60 * 1000;
 
-/** Finds a random opponent: joins someone else's already-waiting
- *  quick-match room if one exists, or creates one and returns its code
- *  so the caller can wait on it exactly like an invite-link room (the
- *  same subscribeRoom/waiting-room flow applies either way — the only
- *  difference is how the code was obtained). Reuses the plain matches
- *  collection (tagged `quickMatch: true`) rather than a separate queue
- *  collection, so it needs no security rules beyond what
- *  createRoom/joinRoom already require. */
-export async function joinQuickMatch(name: string, allTimeMode = false): Promise<string> {
-  const uid = await getUid();
-  const db = getDb();
-
-  const q = query(collection(db, "matches"), where("quickMatch", "==", true), limit(20));
+/** Searches for an already-waiting quick-match room (same allTimeMode,
+ *  not stale, not my own) and atomically claims the oldest one it can —
+ *  the transaction re-checks the document fresh, so if two searchers
+ *  race for the *same* candidate, only one wins and the other falls
+ *  through to try the next. Returns null if nothing was available (or
+ *  every attempt lost its race), not an error — this is the expected
+ *  "nobody's waiting right now" case, not a failure.
+ *
+ *  `onlyIfWinningTiebreak`, when set, further restricts candidates to
+ *  ones whose hostUid sorts before mine — see joinQuickMatch for why
+ *  that matters for its second search specifically. */
+async function findAndClaimQuickMatch(
+  db: ReturnType<typeof getDb>,
+  uid: string,
+  name: string,
+  allTimeMode: boolean,
+  onlyIfWinningTiebreak = false
+): Promise<string | null> {
+  // No orderBy here (deliberately — combining it with the where() below
+  // would need a composite index, a manual Firestore console step this
+  // project otherwise avoids requiring), so this can return an arbitrary
+  // 20 of however many quickMatch:true documents exist — including any
+  // stale orphans that piled up over time, which never get deleted
+  // (the security rules don't allow it). A too-small limit here was a
+  // real, confirmed bug: once enough orphans exist, an arbitrary 20 of
+  // them can crowd out the one fresh, genuinely-waiting room a search
+  // should have found. 300 is comfortably more than this app should
+  // ever see stay *simultaneously non-stale* at its actual scale.
+  const q = query(collection(db, "matches"), where("quickMatch", "==", true), limit(300));
   const snap = await getDocs(q);
   const now = Date.now();
   const candidates = snap.docs
@@ -172,7 +188,8 @@ export async function joinQuickMatch(name: string, allTimeMode = false): Promise
         c.data.status === "waiting" &&
         c.data.hostUid !== uid &&
         !!c.data.allTimeMode === allTimeMode &&
-        now - c.data.createdAt < QUICK_MATCH_STALE_MS
+        now - c.data.createdAt < QUICK_MATCH_STALE_MS &&
+        (!onlyIfWinningTiebreak || uid > c.data.hostUid)
     )
     .sort((a, b) => a.data.createdAt - b.data.createdAt);
 
@@ -195,9 +212,58 @@ export async function joinQuickMatch(name: string, allTimeMode = false): Promise
       continue; // someone else grabbed it (or it's gone) — try the next one
     }
   }
+  return null;
+}
 
-  // No one was waiting (or every race was lost) — become the one waiting.
-  return createRoom(name, true, allTimeMode);
+/** Finds a random opponent: joins someone else's already-waiting
+ *  quick-match room if one exists, or creates one and returns its code
+ *  so the caller can wait on it exactly like an invite-link room (the
+ *  same subscribeRoom/waiting-room flow applies either way — the only
+ *  difference is how the code was obtained). Reuses the plain matches
+ *  collection (tagged `quickMatch: true`) rather than a separate queue
+ *  collection, so it needs no security rules beyond what
+ *  createRoom/joinRoom already require.
+ *
+ *  The initial search-then-maybe-create isn't atomic across two
+ *  different players — if both search at nearly the same moment, before
+ *  either has created anything yet, each one's search can come back
+ *  empty and each independently creates its own room, so neither ever
+ *  finds the other (this was a real, reported bug). A second search
+ *  shortly after creating a room catches the overwhelming majority of
+ *  real cases — by then the other player's create has almost always
+ *  propagated — and switches to joining theirs instead of leaving two
+ *  rooms stranded.
+ *
+ *  That second search has its own race, though: if *both* players reach
+ *  it at nearly the same moment (which, having just gone through the
+ *  identical steps in lockstep, is common), each one's search finds the
+ *  *other's* room and independently claims it in its own transaction —
+ *  and since those are two different documents, both transactions
+ *  succeed. Each player ends up the guest of the other's room instead
+ *  of sharing one (confirmed live: this reproduced in 3 of 8 trials
+ *  before the fix below). Breaking the symmetry fixes it: the second
+ *  search only claims a candidate whose hostUid sorts before mine, so
+ *  of any two players racing each other, only the one with the "larger"
+ *  uid actively claims — the other just keeps waiting on its own room,
+ *  the same as it would if no race were happening at all. */
+export async function joinQuickMatch(name: string, allTimeMode = false): Promise<string> {
+  const uid = await getUid();
+  const db = getDb();
+
+  const found = await findAndClaimQuickMatch(db, uid, name, allTimeMode);
+  if (found) return found;
+
+  const myCode = await createRoom(name, true, allTimeMode);
+  await new Promise((resolve) => setTimeout(resolve, 400));
+
+  const foundAfter = await findAndClaimQuickMatch(db, uid, name, allTimeMode, true);
+  if (foundAfter) {
+    updateDoc(doc(db, "matches", myCode), { quickMatch: false }).catch(() => {
+      /* best-effort cleanup — an extra untagged orphan room isn't harmful */
+    });
+    return foundAfter;
+  }
+  return myCode;
 }
 
 /** Live-subscribes to a room's state. Returns an unsubscribe function. */

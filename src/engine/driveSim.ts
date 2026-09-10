@@ -11,8 +11,8 @@ export interface DriveEvent {
   overtime: boolean;
 }
 
-/** Regulation is a set 24 drives, 12 per team, alternating. */
-export const REGULATION_DRIVES_PER_TEAM = 12;
+/** Regulation is a set number of drives per team, alternating. */
+export const REGULATION_DRIVES_PER_TEAM = 15;
 
 const SCORE_LABELS: Record<number, string> = {
   2: "Safety",
@@ -93,14 +93,14 @@ function labelFor(points: number): string {
  * `hostScore`-`guestScore` — the real outcome, already decided by
  * playGame, is never in question here; this only dramatizes how the
  * score plausibly got there, drive by drive, for the live-score
- * animation. Regulation is a set 24 drives, 12 per team, strictly
- * alternating, coin-tossed for who gets the ball first — real scoring
- * plays mixed with non-scoring possessions padding each team out to
- * exactly 12. If a team's real scoring plays don't fit in 12 (not
- * reachable with this game's real score range today, but handled
- * correctly regardless), the overflow plays out as extra alternating
- * overtime drives, the shorter side padded with its own filler
- * possessions so overtime alternates too. */
+ * animation. Regulation is a set REGULATION_DRIVES_PER_TEAM drives per
+ * team, strictly alternating, coin-tossed for who gets the ball first —
+ * real scoring plays mixed with non-scoring possessions padding each
+ * team out to that exact count. If a team's real scoring plays don't
+ * fit (not reachable with this game's real score range today, but
+ * handled correctly regardless), the overflow plays out as extra
+ * alternating overtime drives, the shorter side padded with its own
+ * filler possessions so overtime alternates too. */
 export function simulateDriveSequence(hostScore: number, guestScore: number): DriveEvent[] {
   const hostSplit = splitDrives(decomposeScore(hostScore), REGULATION_DRIVES_PER_TEAM);
   const guestSplit = splitDrives(decomposeScore(guestScore), REGULATION_DRIVES_PER_TEAM);

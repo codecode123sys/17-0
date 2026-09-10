@@ -35,7 +35,7 @@ describe("simulateDriveSequence", () => {
     expect(punts.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("is a set 24 regulation drives, 12 per team, for any real score", () => {
+  it(`is a set ${REGULATION_DRIVES_PER_TEAM * 2} regulation drives, ${REGULATION_DRIVES_PER_TEAM} per team, for any real score`, () => {
     for (const [host, guest] of [
       [0, 0],
       [3, 3],
@@ -49,20 +49,21 @@ describe("simulateDriveSequence", () => {
       expect(regulation.filter((ev) => ev.team === "host").length).toBe(REGULATION_DRIVES_PER_TEAM);
       expect(regulation.filter((ev) => ev.team === "guest").length).toBe(REGULATION_DRIVES_PER_TEAM);
       // No overtime should ever actually trigger within this game's real
-      // score range (max 59 decomposes into well under 12 scoring plays).
+      // score range (max 59 decomposes into well under REGULATION_DRIVES_PER_TEAM scoring plays).
       expect(seq.every((ev) => !ev.overtime)).toBe(true);
     }
   });
 
-  it("falls back to overtime, still alternating, if a score needs more than 12 scoring plays", () => {
+  it(`falls back to overtime, still alternating, if a score needs more than ${REGULATION_DRIVES_PER_TEAM} scoring plays`, () => {
     // Not reachable by the real game (scores are clamped to 59), but
-    // simulateDriveSequence's own contract should hold regardless —
-    // 100 points needs ~14 seven-point plays, more than fits in 12.
-    const seq = simulateDriveSequence(100, 10);
+    // simulateDriveSequence's own contract should hold regardless — 250
+    // points needs ~36 seven-point plays, comfortably more than fits in
+    // REGULATION_DRIVES_PER_TEAM no matter how that constant is tuned.
+    const seq = simulateDriveSequence(250, 10);
     const overtime = seq.filter((ev) => ev.overtime);
     expect(overtime.length).toBeGreaterThan(0);
     const last = seq[seq.length - 1];
-    expect(last.hostScore).toBe(100);
+    expect(last.hostScore).toBe(250);
     expect(last.guestScore).toBe(10);
     for (let i = 1; i < seq.length; i++) {
       expect(seq[i].team).not.toBe(seq[i - 1].team);

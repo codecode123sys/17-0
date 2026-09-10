@@ -455,11 +455,13 @@ function GameReveal({
 
   if (!finished) {
     const played = result.driveSequence.slice(0, driveIndex);
-    const liveHost = played.length ? played[played.length - 1].hostScore : 0;
-    const liveGuest = played.length ? played[played.length - 1].guestScore : 0;
+    const lastPlayed = played[played.length - 1];
+    const liveHost = lastPlayed ? lastPlayed.hostScore : 0;
+    const liveGuest = lastPlayed ? lastPlayed.guestScore : 0;
     const liveMe = iAmHost ? liveHost : liveGuest;
     const liveOpp = iAmHost ? liveGuest : liveHost;
-    const inOvertime = played.length > 0 && played[played.length - 1].overtime;
+    const inOvertime = !!lastPlayed?.overtime;
+    const justScored = !!lastPlayed && lastPlayed.points > 0;
     const recent = played.slice(-DRIVE_LOG_SIZE);
     const regulationTotal = REGULATION_DRIVES_PER_TEAM * 2;
     const driveLabel = inOvertime
@@ -469,18 +471,33 @@ function GameReveal({
       <section className="view">
         <div className="result-board">
           <div className="verdict">{inOvertime ? "Overtime…" : "Simulating the game…"}</div>
-          <div className="record">
+          <div key={driveIndex} className={"record" + (justScored ? " flash" : "")}>
             {liveMe}&ndash;{liveOpp}
           </div>
           <div className="sub">live score &mdash; you vs. {otherName}</div>
           <div className="sub">{driveLabel}</div>
+          <div className="drive-ticks" aria-hidden="true">
+            {result.driveSequence.slice(0, regulationTotal).map((ev, i) => {
+              const isPlayed = i < driveIndex;
+              const mine = isPlayed && (ev.team === "host") === iAmHost;
+              return (
+                <i
+                  key={i}
+                  className={"tick" + (isPlayed ? " filled" : "") + (isPlayed && ev.points > 0 ? " scored" : "") + (mine ? " mine" : " theirs")}
+                />
+              );
+            })}
+          </div>
         </div>
         <div className="drive-log">
           {recent.map((ev, i) => {
-            const who = (ev.team === "host") === iAmHost ? "You" : otherName;
+            const mine = (ev.team === "host") === iAmHost;
             return (
-              <div key={played.length - recent.length + i} className={"drive-row" + (ev.points > 0 ? " scored" : "")}>
-                <span className="who">{who}</span>
+              <div
+                key={played.length - recent.length + i}
+                className={"drive-row" + (ev.points > 0 ? " scored" : "") + (mine ? " mine" : " theirs")}
+              >
+                <span className="who">{mine ? "You" : otherName}</span>
                 <span className="what">
                   {ev.label}
                   {ev.overtime && " · OT"}

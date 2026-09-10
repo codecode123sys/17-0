@@ -857,11 +857,36 @@
     color: var(--chalk);
   }
   .result-board .record.perfect { color: var(--accent); text-shadow: 0 0 30px rgba(231, 164, 23, .4); }
+  .result-board .record.flash { animation: scoreFlash .55s ease; }
+  @keyframes scoreFlash {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.09); text-shadow: 0 0 34px rgba(231, 164, 23, .85); }
+    100% { transform: scale(1); }
+  }
   .result-board .sub {
     font-size: 13px;
     color: rgba(246, 245, 236, .7);
     font-family: "IBM Plex Mono", monospace;
   }
+
+  .drive-ticks {
+    position: relative;
+    display: flex;
+    gap: 2px;
+    margin-top: 16px;
+  }
+  .drive-ticks .tick {
+    flex: 1 1 0;
+    min-width: 3px;
+    height: 12px;
+    border-radius: 2px;
+    background: rgba(246, 245, 236, .14);
+    transition: background .15s ease, box-shadow .15s ease;
+  }
+  .drive-ticks .tick.filled.mine { background: var(--accent); }
+  .drive-ticks .tick.filled.theirs { background: rgba(246, 245, 236, .5); }
+  .drive-ticks .tick.scored.mine { box-shadow: 0 0 7px rgba(231, 164, 23, .8); }
+  .drive-ticks .tick.scored.theirs { box-shadow: 0 0 7px rgba(246, 245, 236, .4); }
 
   .drive-log {
     margin-top: 16px;
@@ -876,18 +901,30 @@
     padding: 7px 12px;
     background: var(--surface);
     border: 1px solid var(--line);
+    border-left: 3px solid var(--line);
     border-radius: var(--radius);
     font-family: "IBM Plex Mono", monospace;
     font-size: 12px;
     opacity: 0;
     animation: driveIn .25s ease forwards;
   }
-  .drive-row.scored { border-color: var(--accent-strong); }
+  .drive-row.mine { border-left-color: var(--accent-strong); }
+  .drive-row.theirs { border-left-color: var(--muted); }
+  /* Only the non-left sides, so a scored row still shows which team's
+     drive it was via the left border set above (a plain border-color
+     shorthand here would override that on the exact rows it matters
+     most for). */
+  .drive-row.scored {
+    border-top-color: var(--accent-strong);
+    border-right-color: var(--accent-strong);
+    border-bottom-color: var(--accent-strong);
+  }
   .drive-row .who { color: var(--muted); }
   .drive-row .what { color: var(--ink); }
   @keyframes driveIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) {
     .drive-row { animation: none; opacity: 1; }
+    .result-board .record.flash { animation: none; }
   }
 
   .metrics {

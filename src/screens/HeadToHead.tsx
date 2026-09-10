@@ -36,6 +36,7 @@ export function HeadToHead({ game }: { game: GameController }) {
   const [uid, setUid] = useState<string | null>(null);
   const [match, setMatch] = useState<MatchDoc | null>(null);
   const [copyToast, setCopyToast] = useState("");
+  const [allTimeMode, setAllTimeMode] = useState(false);
   const unsubRef = useRef<null | (() => void)>(null);
 
   useEffect(() => {
@@ -90,7 +91,7 @@ export function HeadToHead({ game }: { game: GameController }) {
     setError("");
     setStage("create-wait");
     try {
-      const newCode = await createRoom(getPlayerName() || "Anonymous");
+      const newCode = await createRoom(getPlayerName() || "Anonymous", false, allTimeMode);
       setMatch(null);
       setCode(newCode);
     } catch (e) {
@@ -103,7 +104,7 @@ export function HeadToHead({ game }: { game: GameController }) {
     setError("");
     setStage("queueing");
     try {
-      const newCode = await joinQuickMatch(getPlayerName() || "Anonymous");
+      const newCode = await joinQuickMatch(getPlayerName() || "Anonymous", allTimeMode);
       setMatch(null);
       setCode(newCode);
     } catch (e) {
@@ -182,6 +183,24 @@ export function HeadToHead({ game }: { game: GameController }) {
 
         {stage === "menu" && (
           <div className="controls">
+            <div>
+              <div className="eyebrow" style={{ textAlign: "center", marginBottom: 6 }}>
+                Team pool
+              </div>
+              <div className="modes" role="group" aria-label="Team pool">
+                <button aria-pressed={!allTimeMode} onClick={() => setAllTimeMode(false)}>
+                  By era
+                </button>
+                <button aria-pressed={allTimeMode} onClick={() => setAllTimeMode(true)}>
+                  All-time teams
+                </button>
+              </div>
+            </div>
+            <p className="mode-note">
+              {allTimeMode
+                ? "Each tile is a whole franchise's history — every era it's ever fielded a player in, so there's always plenty to pick from."
+                : "Each tile is one team in one specific decade, like the daily challenge."}
+            </p>
             <button className="btn" onClick={handleQuickMatch} disabled={!uid}>
               Quick match
             </button>
@@ -336,7 +355,7 @@ export function HeadToHead({ game }: { game: GameController }) {
               </div>
               <div className="tile-body">
                 <span className="tile-team">{tile.team}</span>
-                <span className="tile-era">{tile.era}</span>
+                <span className="tile-era">{tile.era ?? "All-time"}</span>
               </div>
             </div>
 

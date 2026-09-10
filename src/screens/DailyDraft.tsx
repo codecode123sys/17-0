@@ -23,8 +23,11 @@ export function DailyDraft({ game }: { game: GameController }) {
   const feasible = (p: Player, tileKey: string) =>
     targetsFor(p, filled).some((slotKey) => canDraftIntoSlot(dailyBoard, dailyUsedKeys, filled, tileKey, slotKey));
 
+  // The daily challenge's own board generator never produces a null era
+  // (that's only ever an "all-time teams" head-to-head thing) — the
+  // non-null assertion reflects that contract, not a runtime check.
   const cards = selectedTile
-    ? roundPlayers(selectedTile.era, selectedTile.team)
+    ? roundPlayers(selectedTile.era!, selectedTile.team)
         .filter((p) => feasible(p, selectedTile.key))
         .sort((a, b) => a.name.localeCompare(b.name))
     : [];

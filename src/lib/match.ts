@@ -15,7 +15,7 @@ import { PLAYERS } from "../data/players";
 import type { Era, Player } from "../data/players";
 import { ERAS, SLOTS, rosterStrength, targetsFor, teamsForEra, teamsPresentInEra } from "../engine/draft";
 import type { FilledSlots } from "../engine/draft";
-import { generateDailyBoard, hasPerfectMatching, tileCanFillSlot, tilePlayers } from "../engine/daily";
+import { generateAllTimeBoard, generateDailyBoard, hasPerfectMatching, tileCanFillSlot, tilePlayers } from "../engine/daily";
 import type { DailyTile } from "../engine/daily";
 import { playGame } from "../engine/season";
 import { simulateDriveSequence } from "../engine/driveSim";
@@ -67,6 +67,12 @@ export interface MatchDoc {
   readyUids: string[];
   result: MatchResult | null;
   quickMatch: boolean;
+  // When true, every tile is a whole franchise's all-time roster (every
+  // era it's ever fielded a player in) instead of one specific decade —
+  // naturally far deeper per tile, so this is the escape hatch for
+  // still running into a thin 1-2 player tile occasionally even with
+  // generateDailyBoard's own depth guarantee.
+  allTimeMode: boolean;
   // Mutual "run it back": uids who've asked for a rematch with this same
   // opponent. Once both have, whichever vote got there second creates a
   // fresh room (both players pre-filled, so it skips straight to
@@ -87,8 +93,10 @@ function randomCode(len = 5): string {
 /** Creates a new room and returns its join code. Retries on the
  *  astronomically unlikely chance of a code collision. `quickMatch` tags
  *  the room as discoverable by joinQuickMatch below — an invite-link room
- *  is otherwise identical, just never advertised. */
-export async function createRoom(name: string, quickMatch = false): Promise<string> {
+ *  is otherwise identical, just never advertised. `allTimeMode` swaps in
+ *  generateAllTimeBoard (whole-franchise tiles) instead of the daily
+ *  challenge's era-restricted generator. */
+export async function createRoom(name: string, quickMatch = false, allTimeMode = false): Promise<string> {
   const uid = await getUid();
   const db = getDb();
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -103,12 +111,13 @@ export async function createRoom(name: string, quickMatch = false): Promise<stri
       hostName: name || "Anonymous",
       guestUid: null,
       guestName: null,
-      board: generateDailyBoard(`${code}:${Date.now()}:${Math.random()}`),
+      board: allTimeMode ? generateAllTimeBoard() : generateDailyBoard(`${code}:${Date.now()}:${Math.random()}`),
       rosters: { [uid]: {} },
       swaps: {},
       readyUids: [],
       result: null,
       quickMatch,
+      allTimeMode,
       rematchVotes: [],
       rematchCode: null,
     };
@@ -149,7 +158,7 @@ const QUICK_MATCH_STALE_MS = 5 * 60 * 1000;
  *  collection (tagged `quickMatch: true`) rather than a separate queue
  *  collection, so it needs no security rules beyond what
  *  createRoom/joinRoom already require. */
-export async function joinQuickMatch(name: string): Promise<string> {
+export async function joinQuickMatch(name: string, allTimeMode = false): Promise<string> {
   const uid = await getUid();
   const db = getDb();
 
@@ -158,7 +167,13 @@ export async function joinQuickMatch(name: string): Promise<string> {
   const now = Date.now();
   const candidates = snap.docs
     .map((d) => ({ ref: d.ref, data: d.data() as MatchDoc }))
-    .filter((c) => c.data.status === "waiting" && c.data.hostUid !== uid && now - c.data.createdAt < QUICK_MATCH_STALE_MS)
+    .filter(
+      (c) =>
+        c.data.status === "waiting" &&
+        c.data.hostUid !== uid &&
+        !!c.data.allTimeMode === allTimeMode &&
+        now - c.data.createdAt < QUICK_MATCH_STALE_MS
+    )
     .sort((a, b) => a.data.createdAt - b.data.createdAt);
 
   for (const candidate of candidates) {
@@ -182,7 +197,7 @@ export async function joinQuickMatch(name: string): Promise<string> {
   }
 
   // No one was waiting (or every race was lost) — become the one waiting.
-  return createRoom(name, true);
+  return createRoom(name, true, allTimeMode);
 }
 
 /** Live-subscribes to a room's state. Returns an unsubscribe function. */
@@ -230,6 +245,12 @@ function randomTeamEraExcluding(exclude: Set<string>): { era: Era; team: string 
   return null;
 }
 
+function randomAllTimeTeamExcluding(exclude: Set<string>): string | null {
+  const allTeams = [...new Set(PLAYERS.map((p) => p.team))].filter((t) => !exclude.has(t));
+  if (!allTeams.length) return null;
+  return allTeams[Math.floor(Math.random() * allTeams.length)];
+}
+
 /** Claims your one personal reroll: swaps the tile for whichever round
  *  you're currently on (derived from how many slots you've already
  *  filled) into a new random team/era — for you only, keeping the rest
@@ -254,16 +275,31 @@ export async function useSkip(code: string): Promise<void> {
 
     const futureTiles = match.board.slice(round + 1);
     const remainingSlotKeys = SLOTS.filter((s) => myRoster[s.key] == null).map((s) => s.key);
-    const exclude = new Set(match.board.map((t) => `${t.era}|${t.team}`));
 
     let replacement: MatchTile | null = null;
-    for (let attempt = 0; attempt < 40; attempt++) {
-      const candidate = randomTeamEraExcluding(exclude);
-      if (!candidate) break;
-      const tile: MatchTile = { key: `swap-${uid}-${round}-${attempt}`, era: candidate.era, team: candidate.team };
-      if (hasPerfectMatching([tile, ...futureTiles], remainingSlotKeys)) {
-        replacement = tile;
-        break;
+    if (match.allTimeMode) {
+      const exclude = new Set(match.board.map((t) => t.team));
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const team = randomAllTimeTeamExcluding(exclude);
+        if (!team) break;
+        const tile: MatchTile = { key: `swap-${uid}-${round}-${attempt}`, era: null, team };
+        if (hasPerfectMatching([tile, ...futureTiles], remainingSlotKeys)) {
+          replacement = tile;
+          break;
+        }
+        exclude.add(team); // don't keep retrying the same rejected team
+      }
+    } else {
+      const exclude = new Set(match.board.map((t) => `${t.era}|${t.team}`));
+      for (let attempt = 0; attempt < 40; attempt++) {
+        const candidate = randomTeamEraExcluding(exclude);
+        if (!candidate) break;
+        const tile: MatchTile = { key: `swap-${uid}-${round}-${attempt}`, era: candidate.era, team: candidate.team };
+        if (hasPerfectMatching([tile, ...futureTiles], remainingSlotKeys)) {
+          replacement = tile;
+          break;
+        }
+        exclude.add(`${candidate.era}|${candidate.team}`); // don't keep retrying the same rejected pair
       }
     }
     if (!replacement) throw new Error("Couldn't find a fair swap right now — try again in a moment.");
@@ -302,7 +338,7 @@ export async function draftPick(code: string, slotKey: string, playerId: number)
 
     const tile = effectiveTile(match, uid, round);
     const player = PLAYERS.find((p) => p.id === playerId);
-    if (!player || player.team !== tile.team || player.era !== tile.era) {
+    if (!player || player.team !== tile.team || (tile.era !== null && player.era !== tile.era)) {
       throw new Error("That player isn't on this round's board.");
     }
     if (!tileCanFillSlot(tile, slotKey)) throw new Error("That player doesn't fit that slot.");
@@ -351,7 +387,13 @@ export async function draftPick(code: string, slotKey: string, playerId: number)
  *  only shape the security rules' create clause allows) and then flipped
  *  to 'active' in a second write, which the update clause allows for
  *  whoever just created it (they're its hostUid). */
-async function createRematchRoom(myUid: string, myName: string, otherUid: string, otherName: string): Promise<string> {
+async function createRematchRoom(
+  myUid: string,
+  myName: string,
+  otherUid: string,
+  otherName: string,
+  allTimeMode: boolean
+): Promise<string> {
   const db = getDb();
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = randomCode();
@@ -365,12 +407,13 @@ async function createRematchRoom(myUid: string, myName: string, otherUid: string
       hostName: myName || "Anonymous",
       guestUid: otherUid,
       guestName: otherName || "Anonymous",
-      board: generateDailyBoard(`${code}:${Date.now()}:${Math.random()}`),
+      board: allTimeMode ? generateAllTimeBoard() : generateDailyBoard(`${code}:${Date.now()}:${Math.random()}`),
       rosters: { [myUid]: {}, [otherUid]: {} },
       swaps: {},
       readyUids: [],
       result: null,
       quickMatch: false,
+      allTimeMode,
       rematchVotes: [],
       rematchCode: null,
     };
@@ -406,6 +449,7 @@ export async function voteRematch(code: string, name: string): Promise<void> {
   let iShouldCreate = false;
   let otherUid = "";
   let otherName = "";
+  let allTimeMode = false;
 
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
@@ -421,12 +465,13 @@ export async function voteRematch(code: string, name: string): Promise<void> {
       iShouldCreate = true;
       otherUid = match.hostUid === uid ? match.guestUid : match.hostUid;
       otherName = (match.hostUid === uid ? match.guestName : match.hostName) ?? "";
+      allTimeMode = match.allTimeMode;
     }
   });
 
   if (!iShouldCreate) return;
 
-  const newCode = await createRematchRoom(uid, name, otherUid, otherName);
+  const newCode = await createRematchRoom(uid, name, otherUid, otherName, allTimeMode);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists()) return;

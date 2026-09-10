@@ -269,12 +269,22 @@ for.
 
 ## Live head-to-head (optional)
 
-Two players draft against the identical sequence of 8 team/era matchups
-(the same board generator as the daily challenge, just seeded per-match
-instead of per-day) — round 1 is the same matchup for both, round 2 is
-the same matchup for both, and so on, drafted blind and entirely
-privately, so both players can even end up drafting the exact same real
-player with no conflict. Each player also gets one personal skip for the
+Two players draft against the identical sequence of 8 matchups (round 1
+is the same matchup for both, round 2 is the same matchup for both, and
+so on), drafted blind and entirely privately, so both players can even
+end up drafting the exact same real player with no conflict. Two team
+pools to pick from when starting a match:
+- **By era** (the default) — each tile is one team in one specific
+  decade, the same board generator as the daily challenge (seeded
+  per-match instead of per-day), preferring franchises deep enough for
+  real choice.
+- **All-time teams** — each tile is a whole franchise's entire history,
+  every era it's ever fielded a player in, rather than one decade of
+  it (`generateAllTimeBoard` in `engine/daily.ts`). Naturally far
+  deeper per tile (dozens of players instead of 3+), for when
+  era-restricted tiles still felt thin too often.
+
+Each player also gets one personal skip for the
 whole match — reroll whichever round you're currently facing into a new
 random matchup, just for you; your opponent's view of that round is
 unaffected. Once both rosters are full, the engine simulates one game

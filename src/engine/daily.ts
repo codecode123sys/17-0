@@ -5,7 +5,11 @@ import type { FilledSlots } from "./draft";
 
 export interface DailyTile {
   key: string; // stable id for this tile, independent of era/team text
-  era: Era;
+  // null means "every era this team has ever fielded a player in" — see
+  // generateAllTimeBoard below. The daily challenge itself never
+  // produces a null era; this exists so head-to-head's "all-time teams"
+  // toggle can reuse the same tile shape and matching logic.
+  era: Era | null;
   team: string;
 }
 
@@ -52,10 +56,8 @@ function pick<T>(arr: T[], rand: () => number): T {
 function coveredSlotKeys(board: DailyTile[]): Set<string> {
   const covered = new Set<string>();
   for (const tile of board) {
-    for (const p of PLAYERS) {
-      if (p.era === tile.era && p.team === tile.team) {
-        for (const s of mappableSlots(p.pos)) covered.add(s.key);
-      }
+    for (const p of tilePlayers(tile)) {
+      for (const s of mappableSlots(p.pos)) covered.add(s.key);
     }
   }
   return covered;
@@ -119,9 +121,42 @@ export function generateDailyBoard(dateKey: string): DailyTile[] {
   return buildBoardAttempt(dateKey, 0);
 }
 
+/** A board of distinct real franchises, each tile drawing from every era
+ * that team has ever fielded a player in — a whole team's history,
+ * rather than one specific decade of it. Naturally far deeper per tile
+ * than an era-restricted one by construction (there's no MIN_BOARD
+ * fallback needed here in practice), which is the whole point: for
+ * head-to-head's "all-time teams" toggle, where players kept running
+ * into 1-2 player era-restricted tiles even after generateDailyBoard's
+ * own depth guarantee. Plain Math.random() rather than a seeded PRNG —
+ * unlike the daily challenge, callers of this persist the result
+ * themselves (head-to-head writes it straight to Firestore) instead of
+ * needing every client to independently derive the same board. */
+export function generateAllTimeBoard(tileCount: number = SLOTS.length): DailyTile[] {
+  const allTeams = [...new Set(PLAYERS.map((p) => p.team))];
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const teams = shuffleInPlace(allTeams).slice(0, tileCount);
+    const board: DailyTile[] = teams.map((team, i) => ({ key: `${i}-alltime-${team}`, era: null, team }));
+    if (bestPossibleRoster(board) !== null) return board;
+  }
+  // Not expected to ever be reached given how deep a whole franchise's
+  // history is, but stay safe rather than throw.
+  const teams = shuffleInPlace(allTeams).slice(0, tileCount);
+  return teams.map((team, i) => ({ key: `${i}-alltime-${team}`, era: null, team }));
+}
+
+function shuffleInPlace<T>(arr: T[]): T[] {
+  const copy = arr.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 /** Every player available from this tile's roster. */
 export function tilePlayers(tile: DailyTile): Player[] {
-  return PLAYERS.filter((p) => p.era === tile.era && p.team === tile.team);
+  return PLAYERS.filter((p) => (tile.era === null || p.era === tile.era) && p.team === tile.team);
 }
 
 export function tileCanFillSlot(tile: DailyTile, slotKey: string): boolean {

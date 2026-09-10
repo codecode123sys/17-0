@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { SLOTS, ERA_CAP } from "./draft";
 import type { FilledSlots } from "./draft";
 import { PLAYERS } from "../data/players";
-import { bestPossibleRoster, canDraftIntoSlot, generateDailyBoard, tilePlayers, todayKey } from "./daily";
+import { bestPossibleRoster, canDraftIntoSlot, generateAllTimeBoard, generateDailyBoard, tilePlayers, todayKey } from "./daily";
 import type { DailyTile } from "./daily";
 
 describe("todayKey", () => {
@@ -32,7 +32,13 @@ describe("generateDailyBoard", () => {
   it("never uses any era more than ERA_CAP times", () => {
     const board = generateDailyBoard("2026-03-15");
     const counts = new Map<string, number>();
-    for (const tile of board) counts.set(tile.era, (counts.get(tile.era) ?? 0) + 1);
+    // generateDailyBoard (unlike generateAllTimeBoard) never produces a
+    // null era — it's a contract of this specific function, hence the
+    // non-null assertion here rather than in the type itself.
+    for (const tile of board) {
+      const era = tile.era!;
+      counts.set(era, (counts.get(era) ?? 0) + 1);
+    }
     for (const count of counts.values()) expect(count).toBeLessThanOrEqual(ERA_CAP);
   });
 
@@ -65,6 +71,31 @@ describe("generateDailyBoard", () => {
       }
     }
     expect(totalTiles).toBe(800);
+  });
+});
+
+describe("generateAllTimeBoard", () => {
+  it("returns SLOTS.length distinct, null-era tiles", () => {
+    const board = generateAllTimeBoard();
+    expect(board).toHaveLength(SLOTS.length);
+    expect(board.every((t) => t.era === null)).toBe(true);
+    expect(new Set(board.map((t) => t.team)).size).toBe(board.length);
+  });
+
+  it("every tile has well more than 3 players (a whole franchise's history)", () => {
+    for (let i = 0; i < 20; i++) {
+      const board = generateAllTimeBoard();
+      for (const tile of board) {
+        expect(tilePlayers(tile).length).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it("still produces a fully solvable board", () => {
+    for (let i = 0; i < 10; i++) {
+      const board = generateAllTimeBoard();
+      expect(bestPossibleRoster(board)).not.toBeNull();
+    }
   });
 });
 

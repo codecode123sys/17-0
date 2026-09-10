@@ -8,7 +8,11 @@ export interface DriveEvent {
   points: number; // 0 for a non-scoring possession
   hostScore: number; // running total after this drive
   guestScore: number;
+  overtime: boolean;
 }
+
+/** Regulation is a set 24 drives, 12 per team, alternating. */
+export const REGULATION_DRIVES_PER_TEAM = 12;
 
 const SCORE_LABELS: Record<number, string> = {
   2: "Safety",
@@ -66,41 +70,55 @@ function alternate(a: Possession[], b: Possession[], aFirst: boolean): Possessio
   return out;
 }
 
+/** Fits a team's real scoring plays into a fixed number of regulation
+ * possessions, padding the rest with non-scoring drives. Every real
+ * score in this game (clamped to at most 59) decomposes into well under
+ * REGULATION_DRIVES_PER_TEAM plays, so the overtime case below is a
+ * correctness fallback more than something that actually triggers — but
+ * a fixed drive count needs one, since nothing guarantees that forever. */
+function splitDrives(scoringPlays: number[], regulationSlots: number): { regulation: number[]; overtime: number[] } {
+  if (scoringPlays.length <= regulationSlots) {
+    const punts = regulationSlots - scoringPlays.length;
+    return { regulation: shuffle([...scoringPlays, ...Array(punts).fill(0)]), overtime: [] };
+  }
+  const shuffled = shuffle(scoringPlays);
+  return { regulation: shuffled.slice(0, regulationSlots), overtime: shuffled.slice(regulationSlots) };
+}
+
+function labelFor(points: number): string {
+  return points === 0 ? PUNT_LABELS[Math.floor(Math.random() * PUNT_LABELS.length)] : SCORE_LABELS[points];
+}
+
 /** A plausible drive-by-drive narration of a game that ends at exactly
  * `hostScore`-`guestScore` — the real outcome, already decided by
  * playGame, is never in question here; this only dramatizes how the
  * score plausibly got there, drive by drive, for the live-score
- * animation. Both teams get the same number of total drives — whichever
- * team needed fewer scoring plays gets padded out with more non-scoring
- * possessions, not just a handful for everyone — specifically so a
- * lopsided score doesn't turn into a long unbroken run of one team's
- * drives; the two teams' drives are shuffled internally, then
- * interleaved so possession strictly alternates, coin-tossed for who
- * gets the ball first. */
+ * animation. Regulation is a set 24 drives, 12 per team, strictly
+ * alternating, coin-tossed for who gets the ball first — real scoring
+ * plays mixed with non-scoring possessions padding each team out to
+ * exactly 12. If a team's real scoring plays don't fit in 12 (not
+ * reachable with this game's real score range today, but handled
+ * correctly regardless), the overflow plays out as extra alternating
+ * overtime drives, the shorter side padded with its own filler
+ * possessions so overtime alternates too. */
 export function simulateDriveSequence(hostScore: number, guestScore: number): DriveEvent[] {
-  const hostScoring = decomposeScore(hostScore);
-  const guestScoring = decomposeScore(guestScore);
+  const hostSplit = splitDrives(decomposeScore(hostScore), REGULATION_DRIVES_PER_TEAM);
+  const guestSplit = splitDrives(decomposeScore(guestScore), REGULATION_DRIVES_PER_TEAM);
 
-  const extraRounds = 2 + Math.floor(Math.random() * 3); // 2-4 punt-only rounds, for pacing
-  const totalDrives = Math.max(hostScoring.length, guestScoring.length) + extraRounds;
-  const hostPunts = totalDrives - hostScoring.length;
-  const guestPunts = totalDrives - guestScoring.length;
+  const otSlots = Math.max(hostSplit.overtime.length, guestSplit.overtime.length);
+  const hostOvertime = [...hostSplit.overtime, ...Array(otSlots - hostSplit.overtime.length).fill(0)];
+  const guestOvertime = [...guestSplit.overtime, ...Array(otSlots - guestSplit.overtime.length).fill(0)];
 
-  const hostDrives = shuffle([...hostScoring, ...Array(hostPunts).fill(0)]).map((points) => ({
-    team: "host" as const,
-    points,
-  }));
-  const guestDrives = shuffle([...guestScoring, ...Array(guestPunts).fill(0)]).map((points) => ({
-    team: "guest" as const,
-    points,
-  }));
+  const toPossessions = (arr: number[], team: DriveTeam) => arr.map((points) => ({ team, points }));
+  const hostFirst = Math.random() < 0.5;
+  const regulation = alternate(toPossessions(hostSplit.regulation, "host"), toPossessions(guestSplit.regulation, "guest"), hostFirst);
+  const overtime = alternate(toPossessions(hostOvertime, "host"), toPossessions(guestOvertime, "guest"), hostFirst);
 
   let host = 0;
   let guest = 0;
-  return alternate(hostDrives, guestDrives, Math.random() < 0.5).map((ev) => {
+  return [...regulation, ...overtime].map((ev, i) => {
     if (ev.team === "host") host += ev.points;
     else guest += ev.points;
-    const label = ev.points === 0 ? PUNT_LABELS[Math.floor(Math.random() * PUNT_LABELS.length)] : SCORE_LABELS[ev.points];
-    return { team: ev.team, label, points: ev.points, hostScore: host, guestScore: guest };
+    return { team: ev.team, label: labelFor(ev.points), points: ev.points, hostScore: host, guestScore: guest, overtime: i >= regulation.length };
   });
 }

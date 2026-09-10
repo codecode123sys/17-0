@@ -439,11 +439,12 @@ function GameReveal({
     const liveGuest = played.length ? played[played.length - 1].guestScore : 0;
     const liveMe = iAmHost ? liveHost : liveGuest;
     const liveOpp = iAmHost ? liveGuest : liveHost;
+    const inOvertime = played.length > 0 && played[played.length - 1].overtime;
     const recent = played.slice(-DRIVE_LOG_SIZE);
     return (
       <section className="view">
         <div className="result-board">
-          <div className="verdict">Simulating the game&hellip;</div>
+          <div className="verdict">{inOvertime ? "Overtime…" : "Simulating the game…"}</div>
           <div className="record">
             {liveMe}&ndash;{liveOpp}
           </div>
@@ -455,7 +456,10 @@ function GameReveal({
             return (
               <div key={played.length - recent.length + i} className={"drive-row" + (ev.points > 0 ? " scored" : "")}>
                 <span className="who">{who}</span>
-                <span className="what">{ev.label}</span>
+                <span className="what">
+                  {ev.label}
+                  {ev.overtime && " · OT"}
+                </span>
               </div>
             );
           })}

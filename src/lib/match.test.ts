@@ -36,13 +36,23 @@ describe("effectiveTile", () => {
   ];
 
   it("returns the shared board tile when a player hasn't swapped", () => {
-    const match: Pick<MatchDoc, "board" | "swaps"> = { board, swaps: {} };
+    const match: Pick<MatchDoc, "hostUid" | "hostBoard" | "guestBoard" | "swaps"> = {
+      hostUid: "u1",
+      hostBoard: board,
+      guestBoard: board,
+      swaps: {},
+    };
     expect(effectiveTile(match, "u1", 0)).toEqual(board[0]);
   });
 
   it("returns a player's private replacement only for the round they swapped", () => {
     const swapTile = { key: "swap", era: "1990s" as const, team: "Cowboys" };
-    const match: Pick<MatchDoc, "board" | "swaps"> = { board, swaps: { u1: { round: 1, tile: swapTile } } };
+    const match: Pick<MatchDoc, "hostUid" | "hostBoard" | "guestBoard" | "swaps"> = {
+      hostUid: "u1",
+      hostBoard: board,
+      guestBoard: board,
+      swaps: { u1: { round: 1, tile: swapTile } },
+    };
     expect(effectiveTile(match, "u1", 0)).toEqual(board[0]); // untouched round
     expect(effectiveTile(match, "u1", 1)).toEqual(swapTile); // swapped round
     expect(effectiveTile(match, "u2", 1)).toEqual(board[1]); // opponent unaffected

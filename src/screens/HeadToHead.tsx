@@ -7,6 +7,7 @@ import { badgeFor } from "../engine/visuals";
 import { firebaseConfigured } from "../lib/firebaseConfig";
 import { getUid } from "../lib/firebase";
 import {
+  boardFor,
   createRoom,
   draftPick,
   draftableThisRound,
@@ -38,6 +39,7 @@ export function HeadToHead({ game }: { game: GameController }) {
   const [match, setMatch] = useState<MatchDoc | null>(null);
   const [copyToast, setCopyToast] = useState("");
   const [allTimeMode, setAllTimeMode] = useState(false);
+  const [sameBoard, setSameBoard] = useState(true);
   const unsubRef = useRef<null | (() => void)>(null);
 
   useEffect(() => {
@@ -92,7 +94,7 @@ export function HeadToHead({ game }: { game: GameController }) {
     setError("");
     setStage("create-wait");
     try {
-      const newCode = await createRoom(getPlayerName() || "Anonymous", false, allTimeMode);
+      const newCode = await createRoom(getPlayerName() || "Anonymous", false, allTimeMode, sameBoard);
       setMatch(null);
       setCode(newCode);
     } catch (e) {
@@ -105,7 +107,7 @@ export function HeadToHead({ game }: { game: GameController }) {
     setError("");
     setStage("queueing");
     try {
-      const newCode = await joinQuickMatch(getPlayerName() || "Anonymous", allTimeMode);
+      const newCode = await joinQuickMatch(getPlayerName() || "Anonymous", allTimeMode, sameBoard);
       setMatch(null);
       setCode(newCode);
     } catch (e) {
@@ -201,6 +203,24 @@ export function HeadToHead({ game }: { game: GameController }) {
               {allTimeMode
                 ? "Each tile is a whole franchise's history — every era it's ever fielded a player in, so there's always plenty to pick from."
                 : "Each tile is one team in one specific decade, like the daily challenge."}
+            </p>
+            <div>
+              <div className="eyebrow" style={{ textAlign: "center", marginBottom: 6 }}>
+                Matchups
+              </div>
+              <div className="modes" role="group" aria-label="Matchups">
+                <button aria-pressed={sameBoard} onClick={() => setSameBoard(true)}>
+                  Same teams
+                </button>
+                <button aria-pressed={!sameBoard} onClick={() => setSameBoard(false)}>
+                  Different teams
+                </button>
+              </div>
+            </div>
+            <p className="mode-note">
+              {sameBoard
+                ? "You and your opponent draft from the identical sequence of teams, round by round."
+                : "You and your opponent each get your own independently generated sequence of teams."}
             </p>
             <button className="btn" onClick={handleQuickMatch} disabled={!uid}>
               Quick match
@@ -320,8 +340,9 @@ export function HeadToHead({ game }: { game: GameController }) {
   const mySkipUsed = !!match.swaps[uid ?? ""];
   const waitingOnOpponent = myRound >= SLOTS.length;
 
+  const myBoard = boardFor(match, uid ?? "");
   const tile = waitingOnOpponent ? null : effectiveTile(match, uid ?? "", myRound);
-  const cards = tile ? draftableThisRound(match.board, myRound, tile, myFilled).sort((a, b) => a.name.localeCompare(b.name)) : [];
+  const cards = tile ? draftableThisRound(myBoard, myRound, tile, myFilled).sort((a, b) => a.name.localeCompare(b.name)) : [];
   const tileMeta = tile ? badgeFor(tile.team) : null;
   const tileStyle = tileMeta ? ({ "--c1": tileMeta.primary, "--c2": tileMeta.secondary } as CSSProperties) : undefined;
 
@@ -379,7 +400,7 @@ export function HeadToHead({ game }: { game: GameController }) {
                   mode="blind"
                   filled={myFilled}
                   onDraft={(slotKey) => handleDraft(p.id, slotKey)}
-                  targetFilter={(slotKey) => feasibleTargetsThisRound(match.board, myRound, p, myFilled).includes(slotKey)}
+                  targetFilter={(slotKey) => feasibleTargetsThisRound(myBoard, myRound, p, myFilled).includes(slotKey)}
                 />
               ))}
             </div>

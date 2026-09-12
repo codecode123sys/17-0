@@ -269,11 +269,9 @@ for.
 
 ## Live head-to-head (optional)
 
-Two players draft against the identical sequence of 8 matchups (round 1
-is the same matchup for both, round 2 is the same matchup for both, and
-so on), drafted blind and entirely privately, so both players can even
-end up drafting the exact same real player with no conflict. Two team
-pools to pick from when starting a match:
+Two players draft blind and entirely privately, so both can even end up
+drafting the exact same real player with no conflict. Two team pools to
+pick from when starting a match:
 - **By era** (the default) — each tile is one team in one specific
   decade, the same board generator as the daily challenge (seeded
   per-match instead of per-day), preferring franchises deep enough for
@@ -283,6 +281,21 @@ pools to pick from when starting a match:
   it (`generateAllTimeBoard` in `engine/daily.ts`). Naturally far
   deeper per tile (dozens of players instead of 3+), for when
   era-restricted tiles still felt thin too often.
+
+There's also a toggle for whether the two players face the same
+matchups or different ones:
+- **Same teams** (the default) — both players draft against the
+  identical sequence of 8 matchups (round 1 is the same matchup for
+  both, round 2 is the same matchup for both, and so on).
+- **Different teams** — each player gets their own independently
+  generated board, so the two drafts don't line up round for round at
+  all.
+
+A room's `hostBoard`/`guestBoard` (`src/lib/match.ts`) are either the
+same array or two independently generated ones depending on this
+toggle; a rematch keeps whatever both toggles (team pool and
+same/different) the original match used, and quick match only ever
+pairs two players who asked for the same combination of both.
 
 Each player also gets one personal skip for the
 whole match — reroll whichever round you're currently facing into a new

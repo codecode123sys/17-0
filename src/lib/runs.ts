@@ -4,9 +4,11 @@ import type { SeasonState } from "../engine/season";
 import { summarizeSeason } from "../engine/season";
 
 const RUNS_KEY = "seventeen-oh-runs";
-// Capped so a long-time player's localStorage doesn't grow without bound —
-// this is meant as "your last several seasons," not a permanent archive.
-const MAX_RUNS = 50;
+// Capped so a long-time player's localStorage doesn't grow without bound.
+// Each run is a few hundred bytes, so even this cap is well under 1MB —
+// comfortably inside localStorage's per-origin limit (5-10MB in every
+// major browser) with a lot of room to spare.
+const MAX_RUNS = 500;
 
 export interface DraftedPlayer {
   name: string;

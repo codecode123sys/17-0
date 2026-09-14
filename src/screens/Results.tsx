@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { Player } from "../data/players";
 import { SLOTS } from "../engine/draft";
 import { fmtPct } from "../engine/projection";
 import { PlayerPortrait } from "../components/PlayerPortrait";
@@ -16,38 +15,13 @@ export function Results({ game }: { game: GameController }) {
   const sum = seasonSummary;
   const perfect = sum.record === "17–0" || sum.result === 5;
   const showRatings = mode === "classic" && !isDaily;
-
-  // Pairs your roster up against the optimal one for the "vs. optimal"
-  // panel below — a player counts as a match wherever they ended up on
-  // either side (a real RB drafted into FLEX instead of RB1 still matches
-  // the optimal roster's RB1 pick), so matched pairs are pulled to the top
-  // and shown together in one row instead of being split across whichever
-  // two slots they each happened to land in.
-  type SlotEntry = { slot: (typeof SLOTS)[number]; player: Player };
-  const yourEntries = SLOTS.map((s) => ({ slot: s, player: filled[s.key] })).filter(
-    (e): e is SlotEntry => e.player != null
+  const optimalIds = new Set(
+    dailyBestRoster
+      ? Object.values(dailyBestRoster)
+          .filter((p): p is NonNullable<typeof p> => p != null)
+          .map((p) => p.id)
+      : []
   );
-  const bestEntries = dailyBestRoster
-    ? SLOTS.map((s) => ({ slot: s, player: dailyBestRoster[s.key] })).filter((e): e is SlotEntry => e.player != null)
-    : [];
-  const bestByPlayerId = new Map(bestEntries.map((e) => [e.player.id, e]));
-  const usedBestSlotKeys = new Set<string>();
-  const matchedRows: { yours: SlotEntry; best: SlotEntry }[] = [];
-  const unmatchedYours: SlotEntry[] = [];
-  for (const e of yourEntries) {
-    const bestMatch = bestByPlayerId.get(e.player.id);
-    if (bestMatch) {
-      matchedRows.push({ yours: e, best: bestMatch });
-      usedBestSlotKeys.add(bestMatch.slot.key);
-    } else {
-      unmatchedYours.push(e);
-    }
-  }
-  const unmatchedBest = bestEntries.filter((e) => !usedBestSlotKeys.has(e.slot.key));
-  const compareRows: { yours: SlotEntry; best: SlotEntry | undefined }[] = [
-    ...matchedRows,
-    ...unmatchedYours.map((y, i) => ({ yours: y, best: unmatchedBest[i] })),
-  ];
 
   async function copyResult() {
     const lines = ["17–0  —  my all-time NFL roster", ""];
@@ -148,35 +122,41 @@ export function Results({ game }: { game: GameController }) {
         <div className="panel-chart">
           <h3>You vs. today&rsquo;s optimal roster</h3>
           <div className="compare-list">
-            {compareRows.map((row, i) => {
-              const matched = !!row.best;
+            {SLOTS.map((s) => {
+              const yours = filled[s.key];
+              const best = dailyBestRoster[s.key];
+              if (!yours || !best) return null;
+              // A player counts as a match as long as they're in the optimal
+              // roster somewhere — not only if they landed in the exact same
+              // slot (e.g. a real RB you drafted into FLEX instead of RB1
+              // still counts, if that same player is the optimal roster's
+              // pick at any position).
+              const matched = optimalIds.has(yours.id);
               return (
-                <div key={i} className={"compare-row" + (matched ? " match" : "")}>
+                <div key={s.key} className={"compare-row" + (matched ? " match" : "")}>
+                  <div className="compare-pos">{s.label}</div>
                   <div className="compare-side">
-                    <span className="lbl">You &middot; {row.yours.slot.label}</span>
+                    <span className="lbl">You</span>
                     <span className="nm">
-                      <TeamBadge team={row.yours.player.team} /> {row.yours.player.name}
+                      <TeamBadge team={yours.team} /> {yours.name}
                     </span>
-                    <span className="tag">{row.yours.player.era}</span>
+                    <span className="tag">{yours.era}</span>
                   </div>
-                  {row.best ? (
-                    <div className="compare-side">
-                      <span className="lbl">Optimal &middot; {row.best.slot.label}</span>
-                      <span className="nm">
-                        <TeamBadge team={row.best.player.team} /> {row.best.player.name}
-                      </span>
-                      <span className="tag">{row.best.player.era}</span>
-                    </div>
-                  ) : (
-                    <div className="compare-side" />
-                  )}
+                  <div className="compare-side">
+                    <span className="lbl">Optimal</span>
+                    <span className="nm">
+                      <TeamBadge team={best.team} /> {best.name}
+                    </span>
+                    <span className="tag">{best.era}</span>
+                  </div>
                   <div className="compare-mark">{matched ? "✓" : "—"}</div>
                 </div>
               );
             })}
           </div>
           <p className="chart-note">
-            {matchedRows.length} of {SLOTS.length} players matched the optimal roster.
+            {SLOTS.filter((s) => filled[s.key] && optimalIds.has(filled[s.key]!.id)).length} of {SLOTS.length}
+            players matched the optimal roster.
           </p>
         </div>
       )}

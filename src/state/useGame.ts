@@ -296,7 +296,10 @@ export function useGame() {
     const nextFilled: FilledSlots = {};
     for (const slot of SLOTS) {
       const dp = run.players[slot.key.toLowerCase()];
-      const p = dp ? PLAYERS.find((pl) => pl.id === dp.id) : undefined;
+      if (!dp) continue;
+      // Runs saved before DraftedPlayer carried an id fall back to matching
+      // on name/team/era, the fields it always had.
+      const p = PLAYERS.find((pl) => pl.id === dp.id) ?? PLAYERS.find((pl) => pl.name === dp.name && pl.team === dp.team && pl.era === dp.era);
       if (p) nextFilled[slot.key] = p;
     }
     setFilled(nextFilled);

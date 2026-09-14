@@ -1,5 +1,6 @@
 import { SLOTS } from "../engine/draft";
 import type { FilledSlots } from "../engine/draft";
+import { todayKey } from "../engine/daily";
 import type { SeasonState } from "../engine/season";
 import { summarizeSeason } from "../engine/season";
 
@@ -81,10 +82,17 @@ export function saveRun(season: SeasonState, filled: FilledSlots, isDaily = fals
   }
 }
 
-/** The most recent daily-challenge run saved for a given day (its
- *  todayKey()), if this device has one — lets a player who already played
- *  today's board come back and see that result again instead of it just
- *  being gone once they leave the results screen. */
+/** The daily-challenge run saved for a given day (its todayKey()), if this
+ *  device has one — lets a player who already played today's board come
+ *  back and see that result again instead of it just being gone once they
+ *  leave the results screen. Falls back to the single most recent run
+ *  saved that same local calendar day if none carries the tag — covers a
+ *  run saved by an older build, before is_daily/daily_date existed, that
+ *  would otherwise be unfindable forever even though the board was
+ *  genuinely played today. */
 export function findDailyRun(dailyDate: string): Run | null {
-  return loadRuns().find((r) => r.is_daily && r.daily_date === dailyDate) ?? null;
+  const runs = loadRuns();
+  const tagged = runs.find((r) => r.is_daily && r.daily_date === dailyDate);
+  if (tagged) return tagged;
+  return runs.find((r) => !r.daily_date && todayKey(new Date(r.created_at)) === dailyDate) ?? null;
 }

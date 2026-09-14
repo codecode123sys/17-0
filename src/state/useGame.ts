@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PLAYERS } from "../data/players";
 import type { Era, Player } from "../data/players";
 import {
+  SLOTS,
   eraSwapAvailable as canSwapEra,
   isDraftComplete,
   respinEra as pickEraSwap,
@@ -16,7 +18,7 @@ import type { Projection } from "../engine/projection";
 import { enterSeason, stepSeason, summarizeSeason } from "../engine/season";
 import type { SeasonState, SeasonSummary } from "../engine/season";
 import { logSeasonResult } from "../lib/logSeason";
-import { loadRuns, saveRun } from "../lib/runs";
+import { findDailyRun, loadRuns, saveRun } from "../lib/runs";
 import type { Run } from "../lib/runs";
 
 export type Screen = "title" | "draft" | "dailyDraft" | "season" | "results" | "history" | "leaderboard" | "h2h";
@@ -280,6 +282,36 @@ export function useGame() {
     [filled, dailySelectedKey, dailyUsedKeys]
   );
 
+  /** Rebuilds and re-shows today's already-completed daily result from its
+   *  saved run (see findDailyRun) — the roster by player id, the season
+   *  outcome as already summarized at save time, and a fresh Monte Carlo
+   *  projection off the saved roster strength (the projection is a random
+   *  sample either way, so a newly drawn one is no less "real" than the one
+   *  shown the first time). Silently does nothing if there's no saved run
+   *  for today, which shouldn't happen whenever dailyPlayedToday is true. */
+  const viewDailyResult = useCallback(() => {
+    const today = todayKey();
+    const run = findDailyRun(today);
+    if (!run) return;
+    const nextFilled: FilledSlots = {};
+    for (const slot of SLOTS) {
+      const dp = run.players[slot.key.toLowerCase()];
+      const p = dp ? PLAYERS.find((pl) => pl.id === dp.id) : undefined;
+      if (p) nextFilled[slot.key] = p;
+    }
+    setFilled(nextFilled);
+    setDailyBestRoster(bestPossibleRoster(generateDailyBoard(today)));
+    setProjection(simulate(run.strength));
+    setSeasonSummary({
+      record: `${run.wins}–${run.losses}`,
+      outcomeText: run.outcome_text,
+      result: run.result,
+      seed: run.seed ?? 0,
+    });
+    setIsDaily(true);
+    setScreen("results");
+  }, []);
+
   const respinTeam = useCallback(() => {
     if (!spin || respinTeamLeft <= 0) return;
     const newTeam = pickTeamSwap(spin.era, spin.team, filled, Math.random, devMode ? DEV_MIN_OVR : 0);
@@ -314,7 +346,7 @@ export function useGame() {
       bumpPlays();
       setBest(loadBest());
       logSeasonResult(season, filled);
-      saveRun(season, filled);
+      saveRun(season, filled, isDaily, isDaily ? todayKey() : null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [season?.phase]);
@@ -418,6 +450,7 @@ export function useGame() {
     startDailyChallenge,
     selectDailyTile,
     chooseDaily,
+    viewDailyResult,
   };
 }
 

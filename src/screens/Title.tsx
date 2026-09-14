@@ -21,6 +21,7 @@ export function Title({ game }: { game: GameController }) {
     tryDevCode,
     startDailyChallenge,
     dailyPlayedToday,
+    viewDailyResult,
     viewHeadToHead,
   } = game;
   const [showCodeEntry, setShowCodeEntry] = useState(false);
@@ -115,9 +116,20 @@ export function Title({ game }: { game: GameController }) {
           <span className="daily-card-tag">Daily challenge</span>
           <span className="daily-card-date">{today}</span>
         </div>
-        <button className="btn accent-outline small" onClick={startDailyChallenge} disabled={dailyLocked}>
-          {dailyLocked ? "Come back tomorrow" : "Play today's board"}
-        </button>
+        {dailyLocked ? (
+          <div className="daily-card-actions">
+            <button className="btn accent-outline small" disabled>
+              Come back tomorrow
+            </button>
+            <button className="btn ghost small" onClick={viewDailyResult}>
+              View today&rsquo;s result
+            </button>
+          </div>
+        ) : (
+          <button className="btn accent-outline small" onClick={startDailyChallenge}>
+            Play today's board
+          </button>
+        )}
       </div>
 
       {firebaseConfigured() && (

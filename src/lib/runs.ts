@@ -11,6 +11,7 @@ const RUNS_KEY = "seventeen-oh-runs";
 const MAX_RUNS = 500;
 
 export interface DraftedPlayer {
+  id: number;
   name: string;
   team: string;
   era: string;
@@ -29,6 +30,12 @@ export interface Run {
   result: number;
   outcome_text: string;
   players: Record<string, DraftedPlayer>;
+  // Set only for a daily-challenge run — dailyDate is that day's todayKey(),
+  // so a later session can find "today's" run again (see findDailyRun) to
+  // let a player revisit a result they already played instead of just
+  // hiding the daily card behind "come back tomorrow".
+  is_daily: boolean;
+  daily_date: string | null;
 }
 
 /** Every saved run on this device, most recent first. Local to this browser
@@ -44,12 +51,12 @@ export function loadRuns(): Run[] {
 /** Saves one completed season to this device's run history. Never throws —
  * a failed save (e.g. localStorage disabled/full) should never affect
  * gameplay. */
-export function saveRun(season: SeasonState, filled: FilledSlots): void {
+export function saveRun(season: SeasonState, filled: FilledSlots, isDaily = false, dailyDate: string | null = null): void {
   try {
     const players: Record<string, DraftedPlayer> = {};
     for (const slot of SLOTS) {
       const p = filled[slot.key];
-      if (p) players[slot.key.toLowerCase()] = { name: p.name, team: p.team, era: p.era, ovr: p.ovr };
+      if (p) players[slot.key.toLowerCase()] = { id: p.id, name: p.name, team: p.team, era: p.era, ovr: p.ovr };
     }
     const summary = summarizeSeason(season);
     const run: Run = {
@@ -64,10 +71,20 @@ export function saveRun(season: SeasonState, filled: FilledSlots): void {
       result: season.result,
       outcome_text: summary.outcomeText,
       players,
+      is_daily: isDaily,
+      daily_date: isDaily ? dailyDate : null,
     };
     const runs = [run, ...loadRuns()].slice(0, MAX_RUNS);
     localStorage.setItem(RUNS_KEY, JSON.stringify(runs));
   } catch {
     /* ignore */
   }
+}
+
+/** The most recent daily-challenge run saved for a given day (its
+ *  todayKey()), if this device has one — lets a player who already played
+ *  today's board come back and see that result again instead of it just
+ *  being gone once they leave the results screen. */
+export function findDailyRun(dailyDate: string): Run | null {
+  return loadRuns().find((r) => r.is_daily && r.daily_date === dailyDate) ?? null;
 }

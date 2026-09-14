@@ -121,7 +121,7 @@ export function Title({ game }: { game: GameController }) {
             <button className="btn accent-outline small" disabled>
               Come back tomorrow
             </button>
-            <button className="btn ghost small" onClick={viewDailyResult}>
+            <button className="btn accent-outline small" onClick={viewDailyResult}>
               View today&rsquo;s result
             </button>
           </div>

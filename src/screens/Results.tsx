@@ -15,6 +15,13 @@ export function Results({ game }: { game: GameController }) {
   const sum = seasonSummary;
   const perfect = sum.record === "17–0" || sum.result === 5;
   const showRatings = mode === "classic" && !isDaily;
+  const optimalIds = new Set(
+    dailyBestRoster
+      ? Object.values(dailyBestRoster)
+          .filter((p): p is NonNullable<typeof p> => p != null)
+          .map((p) => p.id)
+      : []
+  );
 
   async function copyResult() {
     const lines = ["17–0  —  my all-time NFL roster", ""];
@@ -119,7 +126,12 @@ export function Results({ game }: { game: GameController }) {
               const yours = filled[s.key];
               const best = dailyBestRoster[s.key];
               if (!yours || !best) return null;
-              const matched = yours.id === best.id;
+              // A player counts as a match as long as they're in the optimal
+              // roster somewhere — not only if they landed in the exact same
+              // slot (e.g. a real RB you drafted into FLEX instead of RB1
+              // still counts, if that same player is the optimal roster's
+              // pick at any position).
+              const matched = optimalIds.has(yours.id);
               return (
                 <div key={s.key} className={"compare-row" + (matched ? " match" : "")}>
                   <div className="compare-pos">{s.label}</div>
@@ -143,8 +155,8 @@ export function Results({ game }: { game: GameController }) {
             })}
           </div>
           <p className="chart-note">
-            {SLOTS.filter((s) => filled[s.key]?.id === dailyBestRoster[s.key]?.id).length} of {SLOTS.length} slots
-            matched the optimal roster.
+            {SLOTS.filter((s) => filled[s.key] && optimalIds.has(filled[s.key]!.id)).length} of {SLOTS.length}
+            players matched the optimal roster.
           </p>
         </div>
       )}

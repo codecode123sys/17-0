@@ -22,6 +22,18 @@ export function Results({ game }: { game: GameController }) {
           .map((p) => p.id)
       : []
   );
+  // Which slot the optimal roster actually used a given player at — a
+  // match can be at a different slot than yours (a real RB you drafted
+  // into FLEX instead of RB1 still matches), so when it is, the "Optimal"
+  // line shows that same player rather than whoever else optimal put in
+  // this exact slot, with a note of where optimal actually placed them.
+  const bestSlotLabelByPlayerId = new Map<number, string>();
+  if (dailyBestRoster) {
+    for (const s of SLOTS) {
+      const p = dailyBestRoster[s.key];
+      if (p) bestSlotLabelByPlayerId.set(p.id, s.label);
+    }
+  }
 
   async function copyResult() {
     const lines = ["17–0  —  my all-time NFL roster", ""];
@@ -132,6 +144,13 @@ export function Results({ game }: { game: GameController }) {
               // still counts, if that same player is the optimal roster's
               // pick at any position).
               const matched = optimalIds.has(yours.id);
+              // If matched, show your own player again on the Optimal line
+              // (it's genuinely the same pick, just possibly at a different
+              // slot) instead of whoever else optimal put in this exact
+              // slot — otherwise "Matched" would sit above two different
+              // names, which is the actual bug this is fixing.
+              const optimalShown = matched ? yours : best;
+              const optimalSlotLabel = matched ? bestSlotLabelByPlayerId.get(yours.id) : s.label;
               return (
                 <div key={s.key} className={"compare-row" + (matched ? " match" : "")}>
                   <div className="compare-row-head">
@@ -146,11 +165,13 @@ export function Results({ game }: { game: GameController }) {
                     <span className="compare-line-tag">{yours.era}</span>
                   </div>
                   <div className="compare-line">
-                    <span className="compare-line-lbl">Optimal</span>
-                    <span className="compare-line-nm">
-                      <TeamBadge team={best.team} /> {best.name}
+                    <span className="compare-line-lbl">
+                      Optimal{matched && optimalSlotLabel && optimalSlotLabel !== s.label ? ` (${optimalSlotLabel})` : ""}
                     </span>
-                    <span className="compare-line-tag">{best.era}</span>
+                    <span className="compare-line-nm">
+                      <TeamBadge team={optimalShown.team} /> {optimalShown.name}
+                    </span>
+                    <span className="compare-line-tag">{optimalShown.era}</span>
                   </div>
                 </div>
               );

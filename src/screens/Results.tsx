@@ -134,22 +134,24 @@ export function Results({ game }: { game: GameController }) {
               const matched = optimalIds.has(yours.id);
               return (
                 <div key={s.key} className={"compare-row" + (matched ? " match" : "")}>
-                  <div className="compare-pos">{s.label}</div>
-                  <div className="compare-side">
-                    <span className="lbl">You</span>
-                    <span className="nm">
+                  <div className="compare-row-head">
+                    <span className="compare-pos">{s.label}</span>
+                    <span className="compare-mark">{matched ? "✓ Matched" : "No match"}</span>
+                  </div>
+                  <div className="compare-line">
+                    <span className="compare-line-lbl">You</span>
+                    <span className="compare-line-nm">
                       <TeamBadge team={yours.team} /> {yours.name}
                     </span>
-                    <span className="tag">{yours.era}</span>
+                    <span className="compare-line-tag">{yours.era}</span>
                   </div>
-                  <div className="compare-side">
-                    <span className="lbl">Optimal</span>
-                    <span className="nm">
+                  <div className="compare-line">
+                    <span className="compare-line-lbl">Optimal</span>
+                    <span className="compare-line-nm">
                       <TeamBadge team={best.team} /> {best.name}
                     </span>
-                    <span className="tag">{best.era}</span>
+                    <span className="compare-line-tag">{best.era}</span>
                   </div>
-                  <div className="compare-mark">{matched ? "✓" : "—"}</div>
                 </div>
               );
             })}

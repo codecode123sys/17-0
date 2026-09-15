@@ -1336,17 +1336,29 @@
     flex-direction: column;
     gap: 6px;
   }
+  /* Each side used to sit in its own half-width column, side by side —
+   * fine for short names, but two names of very different lengths (plus a
+   * team badge) never lined up from row to row, so the list looked ragged
+   * going down the page. Stacking "You" directly above "Optimal" within a
+   * full-width row, both indented past a fixed-width label, means every
+   * name — on either line, in every row — starts at the exact same x
+   * position, which is what actually reads as "aligned" down a list. */
   .compare-row {
-    display: grid;
-    grid-template-columns: 40px 1fr 1fr 20px;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius);
   }
   .compare-row.match { border-color: var(--accent-strong); }
+  .compare-row-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
   .compare-pos {
     font-family: "Oswald", sans-serif;
     font-weight: 700;
@@ -1354,15 +1366,26 @@
     letter-spacing: .05em;
     color: var(--accent-strong);
   }
-  .compare-side { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-  .compare-side .lbl {
+  .compare-mark {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+  }
+  .compare-row.match .compare-mark { color: var(--accent-strong); }
+  .compare-line { display: flex; align-items: center; gap: 8px; }
+  .compare-line-lbl {
+    flex: 0 0 50px;
     font-family: "IBM Plex Mono", monospace;
     font-size: 9px;
     text-transform: uppercase;
     letter-spacing: .08em;
     color: var(--muted);
   }
-  .compare-side .nm {
+  .compare-line-nm {
+    flex: 1 1 auto;
+    min-width: 0;
     font-family: "Oswald", sans-serif;
     font-weight: 500;
     font-size: 13px;
@@ -1373,18 +1396,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .compare-side .tag {
+  .compare-line-tag {
+    flex: 0 0 auto;
     font-family: "IBM Plex Mono", monospace;
     font-size: 10px;
     color: var(--muted);
   }
-  .compare-mark {
-    text-align: center;
-    font-family: "Oswald", sans-serif;
-    font-weight: 700;
-    color: var(--muted);
-  }
-  .compare-row.match .compare-mark { color: var(--accent-strong); }
 
   .result-actions {
     margin-top: 24px;

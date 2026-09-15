@@ -119,6 +119,51 @@
     gap: 8px;
     margin-bottom: 14px;
   }
+  .weights-info { position: relative; }
+  .weights-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 240px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px;
+    z-index: 20;
+    text-align: left;
+  }
+  .weights-popover-title {
+    font-family: "Oswald", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .weights-list {
+    list-style: none;
+    margin: 0 0 10px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .weights-list li {
+    display: flex;
+    justify-content: space-between;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+  }
+  .weights-list li span:first-child { color: var(--ink); font-weight: 600; }
+  .weights-list li span:last-child { color: var(--accent-strong); }
+  .weights-note {
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--muted);
+    margin: 0;
+  }
   .board {
     background: var(--panel);
     border: 1px solid var(--panel-line);

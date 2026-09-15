@@ -1,7 +1,10 @@
 import { useRef, useState } from "react";
 import { NameForm } from "../components/NameForm";
+import { SLOTS } from "../engine/draft";
 import { firebaseConfigured } from "../lib/firebaseConfig";
 import type { GameController } from "../state/useGame";
+
+const WEIGHTS_DESC = [...SLOTS].sort((a, b) => b.weight - a.weight);
 
 // Clicking the score 7 times within 3 seconds reveals a code prompt.
 // Nothing on screen hints this exists — no visible button, no cursor
@@ -26,6 +29,7 @@ export function Title({ game }: { game: GameController }) {
   } = game;
   const [showCodeEntry, setShowCodeEntry] = useState(false);
   const [code, setCode] = useState("");
+  const [showWeights, setShowWeights] = useState(false);
   const tapCountRef = useRef(0);
   const lastTapRef = useRef(0);
 
@@ -52,6 +56,33 @@ export function Title({ game }: { game: GameController }) {
   return (
     <section className="view">
       <div className="home-nav">
+        <div className="weights-info">
+          <button
+            className="btn ghost small"
+            onClick={() => setShowWeights((v) => !v)}
+            aria-expanded={showWeights}
+          >
+            Position weights
+          </button>
+          {showWeights && (
+            <div className="weights-popover">
+              <div className="weights-popover-title">How much each slot counts</div>
+              <ul className="weights-list">
+                {WEIGHTS_DESC.map((s) => (
+                  <li key={s.key}>
+                    <span>{s.key}</span>
+                    <span>{Math.round(s.weight * 100)}%</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="weights-note">
+                Roster strength is a weighted sum, not a simple average — QB counts the most, TE the least. The same
+                player counts differently depending on which slot they&rsquo;re drafted into, so a &ldquo;perfect&rdquo;
+                lineup has to get both the players and their slots right.
+              </p>
+            </div>
+          )}
+        </div>
         <button className="btn ghost small" onClick={viewLeaderboard}>
           Leaderboard
         </button>

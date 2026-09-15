@@ -24,15 +24,17 @@ export function Results({ game }: { game: GameController }) {
   const sum = seasonSummary;
   const perfect = sum.record === "17–0" || sum.result === 5;
   const showRatings = mode === "classic" && !isDaily;
-  const yourIds = new Set(SLOTS.map((s) => filled[s.key]?.id).filter((id): id is number => id != null));
-  const optimalIds = new Set(
-    dailyBestRoster
-      ? Object.values(dailyBestRoster)
-          .filter((p): p is NonNullable<typeof p> => p != null)
-          .map((p) => p.id)
-      : []
+  // Which slots this exact score used the same player as the optimal
+  // roster — strictly by slot, not just "drafted somewhere." Each slot
+  // carries its own weight toward roster strength (QB counts far more than
+  // TE, for instance — see the "Position weights" box on the home screen),
+  // so the same real player in a different slot is a genuinely different,
+  // less optimal roster, not a wash.
+  const matchedSlotKeys = new Set(
+    SLOTS.filter((s) => filled[s.key] && dailyBestRoster?.[s.key] && filled[s.key]!.id === dailyBestRoster[s.key]!.id).map(
+      (s) => s.key
+    )
   );
-  const matchedIds = new Set([...yourIds].filter((id) => optimalIds.has(id)));
 
   async function copyResult() {
     const lines = ["17–0  —  my all-time NFL roster", ""];
@@ -144,17 +146,12 @@ export function Results({ game }: { game: GameController }) {
             {SLOTS.map((s) => {
               const shown = compareView === "mine" ? filled[s.key] : dailyBestRoster[s.key];
               if (!shown) return null;
-              // A player counts as a match as long as they're in the other
-              // roster somewhere — not only if they landed in the exact same
-              // slot (e.g. a real RB you drafted into FLEX instead of RB1
-              // still counts, if that same player is the optimal roster's
-              // pick at any position).
-              const matched = matchedIds.has(shown.id);
+              const matched = matchedSlotKeys.has(s.key);
               return (
                 <div key={s.key} className={"compare-row" + (matched ? " match" : "")}>
                   <div className="compare-row-head">
                     <span className="compare-pos">{s.label}</span>
-                    <span className="compare-mark">{matched ? "✓ Matched" : "No match"}</span>
+                    <span className="compare-mark">{matched ? "✓ Matched" : "✗ Incorrect"}</span>
                   </div>
                   <div className="compare-line">
                     <span className="compare-line-nm">
@@ -167,7 +164,7 @@ export function Results({ game }: { game: GameController }) {
             })}
           </div>
           <p className="chart-note">
-            {matchedIds.size} of {SLOTS.length} players matched the optimal roster.
+            {matchedSlotKeys.size} of {SLOTS.length} slots matched the optimal roster.
           </p>
         </div>
       )}

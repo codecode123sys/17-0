@@ -1398,6 +1398,14 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .compare-line-note {
+    font-family: "Public Sans", sans-serif;
+    font-weight: 400;
+    font-size: 12.5px;
+    font-style: italic;
+    color: var(--muted);
+    white-space: normal;
+  }
   .compare-line-tag {
     flex: 0 0 auto;
     font-family: "IBM Plex Mono", monospace;

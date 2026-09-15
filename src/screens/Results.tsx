@@ -34,6 +34,16 @@ export function Results({ game }: { game: GameController }) {
       if (p) bestSlotLabelByPlayerId.set(p.id, s.label);
     }
   }
+  // Which slot YOU actually used a given player at — needed for the case
+  // below where optimal's real pick for some other slot is a player you
+  // already drafted somewhere else, so that slot doesn't just repeat their
+  // name as if it were a second, still-missing pick.
+  const yourSlotLabelByPlayerId = new Map<number, string>();
+  for (const s of SLOTS) {
+    const p = filled[s.key];
+    if (p) yourSlotLabelByPlayerId.set(p.id, s.label);
+  }
+  const matchedIds = new Set([...yourSlotLabelByPlayerId.keys()].filter((id) => optimalIds.has(id)));
 
   async function copyResult() {
     const lines = ["17–0  —  my all-time NFL roster", ""];
@@ -143,14 +153,18 @@ export function Results({ game }: { game: GameController }) {
               // slot (e.g. a real RB you drafted into FLEX instead of RB1
               // still counts, if that same player is the optimal roster's
               // pick at any position).
-              const matched = optimalIds.has(yours.id);
+              const matched = matchedIds.has(yours.id);
               // If matched, show your own player again on the Optimal line
               // (it's genuinely the same pick, just possibly at a different
               // slot) instead of whoever else optimal put in this exact
               // slot — otherwise "Matched" would sit above two different
-              // names, which is the actual bug this is fixing.
+              // names. And if this slot's own optimal pick is someone
+              // you've already matched at a different slot, don't repeat
+              // their name here as if they were a second, still-missing
+              // pick — say where you actually have them instead.
               const optimalShown = matched ? yours : best;
               const optimalSlotLabel = matched ? bestSlotLabelByPlayerId.get(yours.id) : s.label;
+              const bestAlreadyYours = !matched && matchedIds.has(best.id);
               return (
                 <div key={s.key} className={"compare-row" + (matched ? " match" : "")}>
                   <div className="compare-row-head">
@@ -168,17 +182,25 @@ export function Results({ game }: { game: GameController }) {
                     <span className="compare-line-lbl">
                       Optimal{matched && optimalSlotLabel && optimalSlotLabel !== s.label ? ` (${optimalSlotLabel})` : ""}
                     </span>
-                    <span className="compare-line-nm">
-                      <TeamBadge team={optimalShown.team} /> {optimalShown.name}
-                    </span>
-                    <span className="compare-line-tag">{optimalShown.era}</span>
+                    {bestAlreadyYours ? (
+                      <span className="compare-line-nm compare-line-note">
+                        You already have {best.name} at {yourSlotLabelByPlayerId.get(best.id)}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="compare-line-nm">
+                          <TeamBadge team={optimalShown.team} /> {optimalShown.name}
+                        </span>
+                        <span className="compare-line-tag">{optimalShown.era}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
           <p className="chart-note">
-            {SLOTS.filter((s) => filled[s.key] && optimalIds.has(filled[s.key]!.id)).length} of {SLOTS.length}
+            {matchedIds.size} of {SLOTS.length}
             players matched the optimal roster.
           </p>
         </div>

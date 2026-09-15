@@ -1398,7 +1398,9 @@
     border: 1px solid var(--line);
     border-radius: var(--radius);
   }
-  .compare-row.match { border-color: var(--win); }
+  .compare-row.status-matched { border-color: var(--win); }
+  .compare-row.status-wrong-position { border-color: var(--accent-strong); }
+  .compare-row.status-incorrect { border-color: var(--loss); }
   .compare-row-head {
     display: flex;
     align-items: baseline;
@@ -1420,7 +1422,9 @@
     letter-spacing: .06em;
     color: var(--muted);
   }
-  .compare-row.match .compare-mark { color: var(--win); }
+  .compare-row.status-matched .compare-mark { color: var(--win); }
+  .compare-row.status-wrong-position .compare-mark { color: var(--accent-strong); }
+  .compare-row.status-incorrect .compare-mark { color: var(--loss); }
   .compare-line { display: flex; align-items: center; gap: 10px; }
   .compare-line-nm {
     flex: 1 1 auto;

@@ -35,6 +35,21 @@ export function Results({ game }: { game: GameController }) {
       (s) => s.key
     )
   );
+  const yourIds = new Set(SLOTS.map((s) => filled[s.key]?.id).filter((id): id is number => id != null));
+  const optimalIds = new Set(
+    dailyBestRoster
+      ? SLOTS.map((s) => dailyBestRoster[s.key]?.id).filter((id): id is number => id != null)
+      : []
+  );
+  // A slot's status: "matched" is the exact same player in the exact same
+  // slot; "wrong-position" is the right player, just drafted somewhere
+  // else (still a real find, just not scored at its full weight here);
+  // "incorrect" is a player who isn't in the other roster at all.
+  type CompareStatus = "matched" | "wrong-position" | "incorrect";
+  function statusFor(slotKey: string, playerId: number, otherIds: Set<number>): CompareStatus {
+    if (matchedSlotKeys.has(slotKey)) return "matched";
+    return otherIds.has(playerId) ? "wrong-position" : "incorrect";
+  }
 
   async function copyResult() {
     const lines = ["17–0  —  my all-time NFL roster", ""];
@@ -146,12 +161,17 @@ export function Results({ game }: { game: GameController }) {
             {SLOTS.map((s) => {
               const shown = compareView === "mine" ? filled[s.key] : dailyBestRoster[s.key];
               if (!shown) return null;
-              const matched = matchedSlotKeys.has(s.key);
+              const status = statusFor(s.key, shown.id, compareView === "mine" ? optimalIds : yourIds);
+              const statusLabel: Record<CompareStatus, string> = {
+                matched: "✓ Matched",
+                "wrong-position": compareView === "mine" ? "↔ Wrong position" : "↔ You have them elsewhere",
+                incorrect: compareView === "mine" ? "✗ Incorrect" : "Not drafted",
+              };
               return (
-                <div key={s.key} className={"compare-row" + (matched ? " match" : "")}>
+                <div key={s.key} className={`compare-row status-${status}`}>
                   <div className="compare-row-head">
                     <span className="compare-pos">{s.label}</span>
-                    <span className="compare-mark">{matched ? "✓ Matched" : "✗ Incorrect"}</span>
+                    <span className="compare-mark">{statusLabel[status]}</span>
                   </div>
                   <div className="compare-line">
                     <span className="compare-line-nm">

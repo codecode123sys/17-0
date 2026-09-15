@@ -10,15 +10,16 @@ export interface DraftSlot {
 
 export const FLEX_POS: Position[] = ["RB", "WR", "TE"];
 
-// 8 slots, weights sum to 1.0. QB heaviest, DEF second — mirrors the
-// reference prototype exactly.
+// 8 slots, weights sum to 1.0. QB heaviest, DEF second. RB1 and WR1 carry
+// the same weight; among the second-tier skill slots, RB2 counts least,
+// WR2 a bit more, and TE a bit more than that.
 export const SLOTS: DraftSlot[] = [
   { key: "QB", label: "QB", pos: ["QB"], weight: 0.24 },
-  { key: "RB1", label: "RB", pos: ["RB"], weight: 0.11 },
-  { key: "RB2", label: "RB", pos: ["RB"], weight: 0.09 },
-  { key: "WR1", label: "WR", pos: ["WR"], weight: 0.13 },
-  { key: "WR2", label: "WR", pos: ["WR"], weight: 0.11 },
-  { key: "TE", label: "TE", pos: ["TE"], weight: 0.08 },
+  { key: "RB1", label: "RB", pos: ["RB"], weight: 0.12 },
+  { key: "RB2", label: "RB", pos: ["RB"], weight: 0.08 },
+  { key: "WR1", label: "WR", pos: ["WR"], weight: 0.12 },
+  { key: "WR2", label: "WR", pos: ["WR"], weight: 0.09 },
+  { key: "TE", label: "TE", pos: ["TE"], weight: 0.11 },
   { key: "FLEX", label: "FLEX", pos: FLEX_POS, weight: 0.1 },
   { key: "DEF", label: "DEF", pos: ["DEF"], weight: 0.14 },
 ];

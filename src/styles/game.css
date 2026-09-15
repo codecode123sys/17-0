@@ -1330,19 +1330,20 @@
   .recap .r .mt { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: var(--muted); margin-top: 3px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
   .recap .r .mt.accolades { color: var(--accent-strong); font-style: italic; margin-top: 1px; }
 
+  .compare-toggle { display: flex; margin-top: 2px; }
+  .compare-toggle button { flex: 1; }
   .compare-list {
-    margin-top: 16px;
+    margin-top: 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
   }
-  /* Each side used to sit in its own half-width column, side by side —
-   * fine for short names, but two names of very different lengths (plus a
-   * team badge) never lined up from row to row, so the list looked ragged
-   * going down the page. Stacking "You" directly above "Optimal" within a
-   * full-width row, both indented past a fixed-width label, means every
-   * name — on either line, in every row — starts at the exact same x
-   * position, which is what actually reads as "aligned" down a list. */
+  /* One full roster shown at a time (see the toggle above it), rather than
+   * squeezing both a "You" and an "Optimal" name into the same row — two
+   * names of very different lengths never lined up side by side, and a
+   * player who matched at a different slot than the one shown either got
+   * displayed twice or needed a caveat to explain why not. A single plain
+   * list per roster sidesteps both problems entirely. */
   .compare-row {
     display: flex;
     flex-direction: column;
@@ -1376,15 +1377,6 @@
   }
   .compare-row.match .compare-mark { color: var(--win); }
   .compare-line { display: flex; align-items: center; gap: 10px; }
-  .compare-line-lbl {
-    flex: 0 0 96px;
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: var(--muted);
-    white-space: nowrap;
-  }
   .compare-line-nm {
     flex: 1 1 auto;
     min-width: 0;
@@ -1397,14 +1389,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .compare-line-note {
-    font-family: "Public Sans", sans-serif;
-    font-weight: 400;
-    font-size: 12.5px;
-    font-style: italic;
-    color: var(--muted);
-    white-space: normal;
   }
   .compare-line-tag {
     flex: 0 0 auto;

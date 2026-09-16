@@ -10,11 +10,21 @@ import { boostedStrength, gauss } from "./season";
 // — see `boostedStrength` in season.ts — rather than falling wherever this
 // base model happens to put it.
 
-/** Win probability against a randomly-drawn opponent of the given mean/spread. */
-export function gameWin(S: number, oppMean: number, oppSd: number, homeBonus: number): boolean {
+// Mirrors season.ts's LOSS_STREAK_PENALTY/MIN_WIN_PROB exactly — keep the
+// two in sync, since this preseason model is meant to approximate the same
+// real played season.
+const LOSS_STREAK_PENALTY = 0.01;
+const MIN_WIN_PROB = 0.03;
+
+/** Win probability against a randomly-drawn opponent of the given
+ *  mean/spread. `lossStreak` (games lost in a row coming into this one)
+ *  shaves a bit off, same as the real played season — see season.ts's
+ *  LOSS_STREAK_PENALTY. */
+export function gameWin(S: number, oppMean: number, oppSd: number, homeBonus: number, lossStreak = 0): boolean {
   let opp = oppMean + gauss() * oppSd;
   opp = Math.max(40, Math.min(105, opp));
-  const p = 1 / (1 + Math.exp(-(S + homeBonus - opp) / 7));
+  const rawP = 1 / (1 + Math.exp(-(S + homeBonus - opp) / 7));
+  const p = Math.max(MIN_WIN_PROB, rawP - LOSS_STREAK_PENALTY * lossStreak);
   return Math.random() < p;
 }
 
@@ -79,9 +89,15 @@ export function simulate(S: number, seasons = 10000): Projection {
   for (let i = 0; i < seasons; i++) {
     let w = 0;
     let perfectSoFar = true;
+    let lossStreak = 0;
     for (let g = 0; g < 17; g++) {
-      if (gameWin(perfectSoFar ? boosted : S, 83, 7, 0)) w++;
-      else perfectSoFar = false;
+      if (gameWin(perfectSoFar ? boosted : S, 83, 7, 0, lossStreak)) {
+        w++;
+        lossStreak = 0;
+      } else {
+        perfectSoFar = false;
+        lossStreak++;
+      }
     }
     winDist[w]++;
     totalWins += w;

@@ -201,16 +201,31 @@ export interface GameResult {
   op: number;
 }
 
+// A losing team presses / loses confidence rather than every game being an
+// independent coin flip — each game currently lost in a row shaves this
+// many percentage points off the very next game's win probability, reset
+// the moment a win breaks the streak. Never touches a team that's still
+// undefeated (lossStreak is 0 by construction until the first loss), so
+// it doesn't interact with boostedStrength/PERFECT_RUN_BOOST's "chasing
+// 17-0" calibration at all — that tail is already over by the time this
+// can ever apply.
+const LOSS_STREAK_PENALTY = 0.01;
+const MIN_WIN_PROB = 0.03;
+
 /** A single simulated, scored game — used for every game the player actually
  * plays. `winStrength` (defaults to `S`) is the strength used only for the
  * win/loss coin flip — a season still chasing 17-0 passes its boosted
  * strength here (see `boostedStrength`) — while the displayed score always
  * reflects the roster's real strength gap, so a boosted-but-still-close
- * game doesn't misleadingly look like a blowout. */
-export function playGame(S: number, ostr: number, home: boolean | null, winStrength: number = S): GameResult {
+ * game doesn't misleadingly look like a blowout. `lossStreak` (see
+ * LOSS_STREAK_PENALTY above) is how many games this team has lost in a
+ * row coming into this one. */
+export function playGame(S: number, ostr: number, home: boolean | null, winStrength: number = S, lossStreak = 0): GameResult {
   const eff = S + (home === true ? 2 : 0);
   const effWin = winStrength + (home === true ? 2 : 0);
-  const win = Math.random() < 1 / (1 + Math.exp(-(effWin - ostr) / 7));
+  const rawP = 1 / (1 + Math.exp(-(effWin - ostr) / 7));
+  const p = Math.max(MIN_WIN_PROB, rawP - LOSS_STREAK_PENALTY * lossStreak);
+  const win = Math.random() < p;
   const loser = Math.round(Math.max(3, Math.min(45, 20 + gauss() * 6)));
   let margin = Math.round(Math.abs(gauss() * 8) + 1 + Math.abs(eff - ostr) * 0.22);
   margin = Math.max(1, Math.min(44, margin));
@@ -355,6 +370,9 @@ export interface SeasonState {
   sched: ScheduleWeek[];
   wins: number;
   losses: number;
+  // Consecutive losses coming into the next game — see LOSS_STREAK_PENALTY.
+  // Reset to 0 by any win.
+  lossStreak: number;
   phase: SeasonPhase;
   seed: number;
   seeds: Team[];
@@ -375,6 +393,7 @@ export function enterSeason(strength: number): SeasonState {
     sched: buildSchedule(lg.teams, lg.div),
     wins: 0,
     losses: 0,
+    lossStreak: 0,
     phase: "regular",
     seed: 0,
     seeds: [],
@@ -447,19 +466,25 @@ export function stepSeason(s: SeasonState): SeasonState {
     let sched = s.sched;
     let wins = s.wins;
     let losses = s.losses;
+    let lossStreak = s.lossStreak;
     if (idx >= 0) {
       const g = s.sched[idx];
       // Still undefeated? Use the boosted win-probability strength for this
       // game only — see boostedStrength's doc comment. A team that's
       // already lost gets no boost, same as always.
       const winStrength = s.losses === 0 ? boostedStrength(s.strength) : s.strength;
-      const o = playGame(s.strength, g.ostr, g.home, winStrength);
+      const o = playGame(s.strength, g.ostr, g.home, winStrength, s.lossStreak);
       sched = s.sched.slice();
       sched[idx] = { ...g, played: true, win: o.win, mp: o.mp, op: o.op };
-      if (o.win) wins++;
-      else losses++;
+      if (o.win) {
+        wins++;
+        lossStreak = 0;
+      } else {
+        losses++;
+        lossStreak++;
+      }
     }
-    const next = { ...s, sched, wins, losses };
+    const next = { ...s, sched, wins, losses, lossStreak };
     if (!sched.some((w) => !w.bye && !w.played)) {
       return computePlayoffs(next);
     }
@@ -468,17 +493,17 @@ export function stepSeason(s: SeasonState): SeasonState {
 
   if (s.phase === "playoffs") {
     const pg = s.bracket[s.bracketCursor];
-    const po = playGame(s.strength, pg.oppStr, pg.home);
+    const po = playGame(s.strength, pg.oppStr, pg.home, s.strength, s.lossStreak);
     const bracket = s.bracket.slice();
     bracket[s.bracketCursor] = { ...pg, played: true, win: po.win, mp: po.mp, op: po.op };
     if (po.win) {
       const bracketCursor = s.bracketCursor + 1;
       if (bracketCursor >= bracket.length) {
-        return { ...s, bracket, bracketCursor, phase: "done", result: 5 };
+        return { ...s, bracket, bracketCursor, phase: "done", result: 5, lossStreak: 0 };
       }
-      return { ...s, bracket, bracketCursor };
+      return { ...s, bracket, bracketCursor, lossStreak: 0 };
     }
-    return { ...s, bracket, phase: "done", result: RD_RESULT[pg.round] };
+    return { ...s, bracket, phase: "done", result: RD_RESULT[pg.round], lossStreak: s.lossStreak + 1 };
   }
 
   return s;

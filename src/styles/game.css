@@ -1449,19 +1449,19 @@
   /* Head-to-head's own "you vs opponent" roster comparison (GameReveal) —
    * kept fully separate from the daily challenge's .compare-* classes
    * above (Results.tsx) after a redesign there silently broke this one by
-   * redefining shared class names neither screen knew the other used. */
+   * redefining shared class names neither screen knew the other used.
+   * A team-colored portrait per player plus a tug-of-war bar per slot,
+   * rather than plain text rows — makes the "who actually won this
+   * position" read at a glance instead of requiring you to compare two
+   * OVR numbers yourself. */
   .h2h-compare-list {
     margin-top: 16px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
   }
   .h2h-compare-row {
-    display: grid;
-    grid-template-columns: 40px 1fr 1fr 20px;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 12px;
+    padding: 10px 12px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -1469,34 +1469,59 @@
   .h2h-compare-pos {
     font-family: "Oswald", sans-serif;
     font-weight: 700;
-    font-size: 11.5px;
-    letter-spacing: .05em;
+    font-size: 11px;
+    letter-spacing: .06em;
     color: var(--accent-strong);
+    margin-bottom: 6px;
   }
-  .h2h-compare-side { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-  .h2h-compare-side .lbl {
+  .h2h-compare-vs {
+    display: grid;
+    grid-template-columns: 1fr 64px 1fr;
+    align-items: center;
+    gap: 10px;
+  }
+  .h2h-compare-side {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .h2h-compare-side .portrait { width: 30px; height: 30px; }
+  .h2h-compare-side.right { flex-direction: row-reverse; text-align: right; }
+  .h2h-compare-info { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .h2h-compare-side.right .h2h-compare-info { align-items: flex-end; }
+  .h2h-compare-info .lbl {
     font-family: "IBM Plex Mono", monospace;
     font-size: 9px;
     text-transform: uppercase;
     letter-spacing: .08em;
     color: var(--muted);
   }
-  .h2h-compare-side .nm {
+  .h2h-compare-info .nm {
     font-family: "Oswald", sans-serif;
     font-weight: 500;
     font-size: 13px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 100%;
   }
-  .h2h-compare-side .tag {
+  .h2h-compare-side.ahead .h2h-compare-info .nm { color: var(--accent-strong); font-weight: 600; }
+  .h2h-compare-info .tag {
     font-family: "IBM Plex Mono", monospace;
     font-size: 10px;
     color: var(--muted);
   }
+  .h2h-compare-bar {
+    display: flex;
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--line);
+  }
+  .h2h-compare-bar i { display: block; height: 100%; transition: width .2s ease; }
+  .h2h-compare-bar i.mine { background: var(--accent-strong); }
+  .h2h-compare-bar i.theirs { background: var(--muted); }
 
   .result-actions {
     margin-top: 24px;

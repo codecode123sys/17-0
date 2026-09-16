@@ -23,6 +23,7 @@ import {
 import type { MatchDoc, MatchResult } from "../lib/match";
 import { getPlayerName } from "../lib/playerName";
 import { PlayerCard } from "../components/PlayerCard";
+import { PlayerPortrait } from "../components/PlayerPortrait";
 import { TeamBadge } from "../components/TeamBadge";
 import type { GameController } from "../state/useGame";
 
@@ -704,18 +705,38 @@ function FinalReveal({
         {SLOTS.map((slot) => {
           const mine = myFilled[slot.key];
           const theirs = oppFilled[slot.key];
+          // A pure OVR ratio barely moves the bar for the kind of gaps that
+          // actually show up (a few points on a 52-99 scale) — exaggerated
+          // 3x around the midpoint so a real edge actually reads as one,
+          // clamped so neither side ever fully vanishes.
+          const diff = mine && theirs ? mine.ovr - theirs.ovr : 0;
+          const minePct = Math.max(8, Math.min(92, 50 + diff * 3));
+          const mineAhead = mine && theirs && mine.ovr > theirs.ovr;
+          const theirsAhead = mine && theirs && theirs.ovr > mine.ovr;
           return (
             <div key={slot.key} className="h2h-compare-row">
               <div className="h2h-compare-pos">{slot.label}</div>
-              <div className="h2h-compare-side">
-                <span className="lbl">You</span>
-                <span className="nm">{mine ? mine.name : "—"}</span>
-                {mine && <span className="tag">OVR {mine.ovr}</span>}
-              </div>
-              <div className="h2h-compare-side">
-                <span className="lbl">{otherName}</span>
-                <span className="nm">{theirs ? theirs.name : "—"}</span>
-                {theirs && <span className="tag">OVR {theirs.ovr}</span>}
+              <div className="h2h-compare-vs">
+                <div className={"h2h-compare-side" + (mineAhead ? " ahead" : "")}>
+                  {mine && <PlayerPortrait player={mine} />}
+                  <span className="h2h-compare-info">
+                    <span className="lbl">You</span>
+                    <span className="nm">{mine ? mine.name : "—"}</span>
+                    {mine && <span className="tag">OVR {mine.ovr}</span>}
+                  </span>
+                </div>
+                <div className="h2h-compare-bar">
+                  <i className="mine" style={{ width: `${minePct}%` }} />
+                  <i className="theirs" style={{ width: `${100 - minePct}%` }} />
+                </div>
+                <div className={"h2h-compare-side right" + (theirsAhead ? " ahead" : "")}>
+                  {theirs && <PlayerPortrait player={theirs} />}
+                  <span className="h2h-compare-info">
+                    <span className="lbl">{otherName}</span>
+                    <span className="nm">{theirs ? theirs.name : "—"}</span>
+                    {theirs && <span className="tag">OVR {theirs.ovr}</span>}
+                  </span>
+                </div>
               </div>
             </div>
           );

@@ -5,6 +5,7 @@ import { PlayerPortrait } from "../components/PlayerPortrait";
 import { TeamBadge } from "../components/TeamBadge";
 import { WinDistributionChart } from "../components/WinDistributionChart";
 import { PlayoffLadder } from "../components/PlayoffLadder";
+import { renderResultCard } from "../lib/shareCard";
 import type { GameController } from "../state/useGame";
 
 export function Results({ game }: { game: GameController }) {
@@ -67,6 +68,41 @@ export function Results({ game }: { game: GameController }) {
       setToast("Copied to clipboard.");
     } catch {
       setToast("Couldn’t copy — select and copy manually.");
+    }
+  }
+
+  /** Shares (or otherwise hands off) a rendered image of the result card —
+   *  a plain text blob doesn't spread on social platforms the way an
+   *  actual image does, and every fallback here still ends with the player
+   *  holding a shareable PNG one way or another. Tries, in order: the
+   *  native share sheet (best on mobile — posts straight into whatever
+   *  app they pick), then copying the image to the clipboard (best on
+   *  desktop — paste straight into a tweet/reply), then a plain download
+   *  if neither API is available. */
+  async function shareImage() {
+    try {
+      const blob = await renderResultCard({ filled, record: sum.record, outcomeText: sum.outcomeText, isDaily });
+      const file = new File([blob], "17-0-result.png", { type: "image/png" });
+
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "17–0", text: "My all-time NFL roster" });
+        return;
+      }
+      if (window.ClipboardItem && navigator.clipboard.write) {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        setToast("Image copied — paste it anywhere.");
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "17-0-result.png";
+      a.click();
+      URL.revokeObjectURL(url);
+      setToast("Image downloaded.");
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return; // user cancelled the share sheet
+      setToast("Couldn’t create the image on this browser.");
     }
   }
 
@@ -199,6 +235,9 @@ export function Results({ game }: { game: GameController }) {
             Draft again
           </button>
         )}
+        <button className="btn ghost" onClick={shareImage}>
+          Share image
+        </button>
         <button className="btn ghost" onClick={copyResult}>
           Copy result
         </button>

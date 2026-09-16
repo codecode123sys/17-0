@@ -27,12 +27,14 @@ export function clampStr(v: number): number {
 // running the table follows a deliberately simple curve: essentially
 // impossible at/below 87, a linear ramp through 88 (0.4%) and 89 (0.8%),
 // then a jump at 90 (4%) and 91 (5%), continuing the same +1 percentage
-// point per additional strength point above that — one point tighter at
-// every anchor than the previous curve (was 0.5/1/5/6/+1pp), to make a
-// perfect run a bit harder to pull off without touching an ordinary team's
-// win rate (that's governed entirely by the /7 divisor and 83 baseline
-// below, untouched here). Re-run the calibration if the divisor or
-// baseline ever change, since this table is only valid against them.
+// point per additional strength point above that, up through 98.75 —
+// the true achievable ceiling (`scripts` equivalent: an exhaustive search
+// over every position's best era-cap-respecting assignment), which moved
+// up from 97.74 after a round of historical-legend rating bumps put
+// several pre-2020s players at 98-99 for the first time. Re-run the
+// achievable-ceiling search (and this calibration) after any future
+// rating change large enough to move it again, and re-run the calibration
+// on its own if the /7 divisor or 83 baseline ever change instead.
 const PERFECT_RUN_BOOST: readonly [number, number][] = [
   [87, 87.0],
   [88, 89.41],
@@ -45,7 +47,8 @@ const PERFECT_RUN_BOOST: readonly [number, number][] = [
   [95, 96.76],
   [96, 97.18],
   [97, 97.55],
-  [97.74, 97.82],
+  [98, 97.83],
+  [98.75, 98.01],
 ];
 
 /** The effective strength to use for a game in a season that hasn't lost
@@ -105,8 +108,9 @@ export interface League {
  *  calibrated against the player rating scale in src/data/players.ts (see
  *  scripts/build_offense_stats.py and scripts/recalibrate_ratings.py,
  *  which rate players by standard deviations above their position/era peer
- *  group — the best achievable 8-man roster currently lands around 97,
- *  and ratings across the pool lean generous by design — the achievable
+ *  group — the best achievable 8-man roster currently lands around 98.75
+ *  (see PERFECT_RUN_BOOST's comment above), and ratings across the pool
+ *  lean generous by design — the achievable
  *  ceiling and typical roster strength sit closer together than a purely
  *  stats-derived scale would produce) — the divisor was tightened from 6 to
  *  7 to make a perfect 17-0 run rarer without meaningfully changing an

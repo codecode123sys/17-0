@@ -4,10 +4,6 @@ import type { Player } from "../data/players";
 import { PlayerPortrait } from "./PlayerPortrait";
 import { TeamBadge } from "./TeamBadge";
 
-function labelOf(key: string): string {
-  return SLOTS.find((s) => s.key === key)!.label;
-}
-
 function uniq<T>(arr: T[]): T[] {
   return arr.filter((v, i) => arr.indexOf(v) === i);
 }
@@ -33,15 +29,8 @@ export function PlayerCard({
    *  because targetFilter blocked them, not because the position is full. */
   lockedNote?: string;
 }) {
-  const seen = new Set<string>();
   const rawTargets = targetsFor(player, filled);
-  const filtered = targetFilter ? rawTargets.filter(targetFilter) : rawTargets;
-  const targets = filtered.filter((key) => {
-    const l = labelOf(key);
-    if (seen.has(l)) return false;
-    seen.add(l);
-    return true;
-  });
+  const targets = targetFilter ? rawTargets.filter(targetFilter) : rawTargets;
   const locked = targets.length === 0;
   const tierClass = player.ovr >= 90 ? "tier1" : "tier2";
 
@@ -77,9 +66,13 @@ export function PlayerCard({
         <span className="targets">
           {targets.map((key) => {
             const slot = SLOTS.find((s) => s.key === key)!;
+            // The key (RB1/RB2, WR1/WR2, FLEX...), not the shared label —
+            // each slot carries its own weight toward roster strength, so
+            // when a player is eligible for more than one, which exact
+            // slot they land in is a real choice, not a cosmetic one.
             return (
               <button key={key} type="button" className="tgt" onClick={() => onDraft(key)}>
-                {targets.length > 1 ? `→ ${slot.label}` : `Draft to ${slot.label}`}
+                {targets.length > 1 ? `→ ${slot.key}` : `Draft to ${slot.label}`}
               </button>
             );
           })}

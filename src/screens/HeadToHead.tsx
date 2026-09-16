@@ -700,19 +700,19 @@ function FinalReveal({
         <div className="sub">{betterTeamLine}</div>
       </div>
 
-      <div className="compare-list">
+      <div className="h2h-compare-list">
         {SLOTS.map((slot) => {
           const mine = myFilled[slot.key];
           const theirs = oppFilled[slot.key];
           return (
-            <div key={slot.key} className="compare-row">
-              <div className="compare-pos">{slot.label}</div>
-              <div className="compare-side">
+            <div key={slot.key} className="h2h-compare-row">
+              <div className="h2h-compare-pos">{slot.label}</div>
+              <div className="h2h-compare-side">
                 <span className="lbl">You</span>
                 <span className="nm">{mine ? mine.name : "—"}</span>
                 {mine && <span className="tag">OVR {mine.ovr}</span>}
               </div>
-              <div className="compare-side">
+              <div className="h2h-compare-side">
                 <span className="lbl">{otherName}</span>
                 <span className="nm">{theirs ? theirs.name : "—"}</span>
                 {theirs && <span className="tag">OVR {theirs.ovr}</span>}

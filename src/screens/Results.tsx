@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { SLOTS } from "../engine/draft";
+import { compareToOptimal } from "../engine/daily";
 import { fmtPct } from "../engine/projection";
 import { PlayerPortrait } from "../components/PlayerPortrait";
 import { TeamBadge } from "../components/TeamBadge";
@@ -25,32 +26,11 @@ export function Results({ game }: { game: GameController }) {
   const sum = seasonSummary;
   const perfect = sum.record === "17–0" || sum.result === 5;
   const showRatings = mode === "classic" && !isDaily;
-  // Which slots this exact score used the same player as the optimal
-  // roster — strictly by slot, not just "drafted somewhere." Each slot
-  // carries its own weight toward roster strength (QB counts far more than
-  // TE, for instance — see the "Position weights" box on the home screen),
-  // so the same real player in a different slot is a genuinely different,
-  // less optimal roster, not a wash.
-  const matchedSlotKeys = new Set(
-    SLOTS.filter((s) => filled[s.key] && dailyBestRoster?.[s.key] && filled[s.key]!.id === dailyBestRoster[s.key]!.id).map(
-      (s) => s.key
-    )
-  );
-  const yourIds = new Set(SLOTS.map((s) => filled[s.key]?.id).filter((id): id is number => id != null));
-  const optimalIds = new Set(
-    dailyBestRoster
-      ? SLOTS.map((s) => dailyBestRoster[s.key]?.id).filter((id): id is number => id != null)
-      : []
-  );
-  // A slot's status: "matched" is the exact same player in the exact same
-  // slot; "wrong-position" is the right player, just drafted somewhere
-  // else (still a real find, just not scored at its full weight here);
-  // "incorrect" is a player who isn't in the other roster at all.
-  type CompareStatus = "matched" | "wrong-position" | "incorrect";
-  function statusFor(slotKey: string, playerId: number, otherIds: Set<number>): CompareStatus {
-    if (matchedSlotKeys.has(slotKey)) return "matched";
-    return otherIds.has(playerId) ? "wrong-position" : "incorrect";
-  }
+  // Per-slot verdict against the optimal roster — see compareToOptimal's
+  // doc comment. Computed both directions so the "Your roster"/"Optimal
+  // roster" toggle below can show either side with the same coloring.
+  const myStatus = dailyBestRoster ? compareToOptimal(filled, dailyBestRoster) : {};
+  const optimalStatus = dailyBestRoster ? compareToOptimal(dailyBestRoster, filled) : {};
 
   async function copyResult() {
     const lines = ["17–0  —  my all-time NFL roster", ""];
@@ -81,7 +61,13 @@ export function Results({ game }: { game: GameController }) {
    *  if neither API is available. */
   async function shareImage() {
     try {
-      const blob = await renderResultCard({ filled, record: sum.record, outcomeText: sum.outcomeText, isDaily });
+      const blob = await renderResultCard({
+        filled,
+        record: sum.record,
+        outcomeText: sum.outcomeText,
+        isDaily,
+        dailyBestRoster: isDaily ? dailyBestRoster : null,
+      });
       const file = new File([blob], "17-0-result.png", { type: "image/png" });
 
       if (navigator.canShare?.({ files: [file] })) {
@@ -197,8 +183,8 @@ export function Results({ game }: { game: GameController }) {
             {SLOTS.map((s) => {
               const shown = compareView === "mine" ? filled[s.key] : dailyBestRoster[s.key];
               if (!shown) return null;
-              const status = statusFor(s.key, shown.id, compareView === "mine" ? optimalIds : yourIds);
-              const statusLabel: Record<CompareStatus, string> = {
+              const status = (compareView === "mine" ? myStatus : optimalStatus)[s.key] ?? "incorrect";
+              const statusLabel: Record<typeof status, string> = {
                 matched: "✓ Matched",
                 "wrong-position": compareView === "mine" ? "↔ Wrong position" : "↔ You have them elsewhere",
                 incorrect: compareView === "mine" ? "✗ Incorrect" : "Not drafted",
@@ -220,7 +206,8 @@ export function Results({ game }: { game: GameController }) {
             })}
           </div>
           <p className="chart-note">
-            {matchedSlotKeys.size} of {SLOTS.length} slots matched the optimal roster.
+            {Object.values(myStatus).filter((s) => s === "matched").length} of {SLOTS.length} slots matched the optimal
+            roster.
           </p>
         </div>
       )}

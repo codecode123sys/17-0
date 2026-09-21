@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import { SLOTS, ERA_CAP } from "./draft";
 import type { FilledSlots } from "./draft";
 import { PLAYERS } from "../data/players";
-import { bestPossibleRoster, canDraftIntoSlot, generateAllTimeBoard, generateDailyBoard, tilePlayers, todayKey } from "./daily";
+import {
+  bestPossibleRoster,
+  canDraftIntoSlot,
+  compareToOptimal,
+  generateAllTimeBoard,
+  generateDailyBoard,
+  tilePlayers,
+  todayKey,
+} from "./daily";
 import type { DailyTile } from "./daily";
 
 describe("todayKey", () => {
@@ -118,6 +126,30 @@ describe("bestPossibleRoster", () => {
     const roster = bestPossibleRoster(board)!;
     const names = SLOTS.map((s) => roster[s.key]!.name);
     expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe("compareToOptimal", () => {
+  const qb1 = { id: 901, name: "QB One", team: "Colts", era: "2000s", pos: "QB", ovr: 90, stats: "", accolades: "" } as const;
+  const qb2 = { id: 902, name: "QB Two", team: "Bills", era: "2020s", pos: "QB", ovr: 88, stats: "", accolades: "" } as const;
+  const rb1 = { id: 903, name: "RB One", team: "Browns", era: "1960s", pos: "RB", ovr: 92, stats: "", accolades: "" } as const;
+
+  it("marks the same player in the same slot as matched", () => {
+    const filled = { QB: qb1 } as unknown as FilledSlots;
+    const best = { QB: qb1 } as unknown as FilledSlots;
+    expect(compareToOptimal(filled, best).QB).toBe("matched");
+  });
+
+  it("marks the right player in a different slot as wrong-position", () => {
+    const filled = { FLEX: rb1 } as unknown as FilledSlots;
+    const best = { RB1: rb1 } as unknown as FilledSlots;
+    expect(compareToOptimal(filled, best).FLEX).toBe("wrong-position");
+  });
+
+  it("marks a player who isn't in the optimal roster at all as incorrect", () => {
+    const filled = { QB: qb2 } as unknown as FilledSlots;
+    const best = { QB: qb1 } as unknown as FilledSlots;
+    expect(compareToOptimal(filled, best).QB).toBe("incorrect");
   });
 });
 

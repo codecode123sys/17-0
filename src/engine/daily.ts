@@ -275,3 +275,25 @@ export function bestPossibleRoster(board: DailyTile[]): FilledSlots | null {
   }
   return filled;
 }
+
+export type SlotCompareStatus = "matched" | "wrong-position" | "incorrect";
+
+/** Per-slot verdict for a drafted roster against the optimal one for the
+ *  same board — "matched" is the exact same player in the exact same
+ *  slot; "wrong-position" is the right player, just drafted somewhere
+ *  else (each slot carries its own weight toward roster strength, so
+ *  that's a real, if smaller, miss, not a wash); "incorrect" is a player
+ *  who isn't in the optimal roster at all. Shared by the results screen
+ *  and the shareable result card so the two never drift apart. */
+export function compareToOptimal(filled: FilledSlots, best: FilledSlots): Record<string, SlotCompareStatus> {
+  const optimalIds = new Set(SLOTS.map((s) => best[s.key]?.id).filter((id): id is number => id != null));
+  const status: Record<string, SlotCompareStatus> = {};
+  for (const s of SLOTS) {
+    const p = filled[s.key];
+    if (!p) continue;
+    const b = best[s.key];
+    if (b && p.id === b.id) status[s.key] = "matched";
+    else status[s.key] = optimalIds.has(p.id) ? "wrong-position" : "incorrect";
+  }
+  return status;
+}

@@ -1,15 +1,33 @@
 import type { FilledSlots } from "../engine/draft";
 import { SLOTS } from "../engine/draft";
+import { compareToOptimal } from "../engine/daily";
+import type { SlotCompareStatus } from "../engine/daily";
 import { teamMeta } from "../data/teams";
 
 const WIDTH = 1200;
 const HEIGHT = 630;
+
+const STATUS_COLOR: Record<SlotCompareStatus, string> = {
+  matched: "#2f8f4e", // green — same player, same slot
+  "wrong-position": "#e7a417", // orange — right player, wrong slot
+  incorrect: "#c5443b", // red — not in the optimal roster at all
+};
+const STATUS_MARK: Record<SlotCompareStatus, string> = {
+  matched: "✓",
+  "wrong-position": "↔",
+  incorrect: "✗",
+};
 
 export interface ShareCardData {
   filled: FilledSlots;
   record: string;
   outcomeText: string;
   isDaily: boolean;
+  /** The daily challenge's optimal roster, when there is one — tints each
+   *  card by its compareToOptimal verdict and adds a headline "N/8
+   *  optimal" stat, the same colors (green/orange/red) as the results
+   *  screen's own comparison panel. */
+  dailyBestRoster?: FilledSlots | null;
 }
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -73,6 +91,19 @@ export async function renderResultCard(data: ShareCardData): Promise<Blob> {
   ctx.fillStyle = "rgba(246,245,236,0.55)";
   ctx.textAlign = "right";
   ctx.fillText(data.isDaily ? "DAILY CHALLENGE · DRAFT17-0.COM" : "DRAFT17-0.COM", WIDTH - 48, 60);
+
+  const statusMap = data.dailyBestRoster ? compareToOptimal(data.filled, data.dailyBestRoster) : null;
+  const matchedCount = statusMap ? Object.values(statusMap).filter((s) => s === "matched").length : 0;
+
+  if (statusMap) {
+    const pct = Math.round((matchedCount / SLOTS.length) * 100);
+    ctx.fillStyle = "#e7a417";
+    ctx.font = "700 46px Anton, sans-serif";
+    ctx.fillText(`${pct}%`, WIDTH - 48, 130);
+    ctx.font = "600 16px Oswald, sans-serif";
+    ctx.fillStyle = "rgba(246,245,236,0.65)";
+    ctx.fillText(`${matchedCount}/${SLOTS.length} OPTIMAL`, WIDTH - 48, 152);
+  }
   ctx.textAlign = "left";
 
   // ---------- record / outcome ----------
@@ -98,14 +129,24 @@ export async function renderResultCard(data: ShareCardData): Promise<Blob> {
     const row = Math.floor(i / cols);
     const x = gridLeft + col * (cardW + gridGap);
     const y = gridTop + row * (cardH + gridGap);
+    const status = statusMap?.[slot.key];
+    const statusColor = status ? STATUS_COLOR[status] : null;
 
-    ctx.fillStyle = "rgba(246,245,236,0.06)";
+    ctx.fillStyle = statusColor ? `${statusColor}1f` : "rgba(246,245,236,0.06)"; // ~12% tint
     roundRect(ctx, x, y, cardW, cardH, 10);
     ctx.fill();
-    ctx.strokeStyle = "rgba(246,245,236,0.12)";
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = statusColor ?? "rgba(246,245,236,0.12)";
+    ctx.lineWidth = statusColor ? 2 : 1;
     roundRect(ctx, x, y, cardW, cardH, 10);
     ctx.stroke();
+
+    if (status) {
+      ctx.fillStyle = STATUS_COLOR[status];
+      ctx.font = "700 18px Oswald, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(STATUS_MARK[status], x + cardW - 14, y + 28);
+      ctx.textAlign = "left";
+    }
 
     if (!p) return;
     const meta = teamMeta(p.team);

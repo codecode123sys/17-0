@@ -114,17 +114,24 @@
 
   /* ---------- Title ---------- */
   .home-nav {
+    position: relative;
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: 8px;
     margin-bottom: 14px;
   }
-  .weights-info { position: relative; }
+  /* Positioned against .home-nav itself, not the "Position weights"
+   * button — the button can sit anywhere in the packed right-aligned
+   * group depending on screen width, but the row always spans the full
+   * content width, so anchoring here is what actually keeps this on
+   * screen on a narrow phone instead of spilling off the left edge. */
   .weights-popover {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
     width: 240px;
+    max-width: calc(100vw - 40px);
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius);

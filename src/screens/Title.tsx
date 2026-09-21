@@ -24,6 +24,7 @@ export function Title({ game }: { game: GameController }) {
     tryDevCode,
     startDailyChallenge,
     dailyPlayedToday,
+    dailyHardPlayedToday,
     viewDailyResult,
     viewHeadToHead,
   } = game;
@@ -51,6 +52,7 @@ export function Title({ game }: { game: GameController }) {
   }
 
   const dailyLocked = dailyPlayedToday && !devMode;
+  const dailyHardLocked = dailyHardPlayedToday && !devMode;
   const today = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
   return (
@@ -147,29 +149,30 @@ export function Title({ game }: { game: GameController }) {
           <span className="daily-card-tag">Daily challenge</span>
           <span className="daily-card-date">{today}</span>
         </div>
-        {dailyLocked ? (
-          <div className="daily-card-actions">
-            <button className="btn accent-outline small" disabled>
-              Come back tomorrow
-            </button>
-            <button className="btn accent-outline small" onClick={viewDailyResult}>
+        <div className="daily-card-actions">
+          {dailyLocked ? (
+            <button className="btn accent-outline small" onClick={() => viewDailyResult(false)}>
               View today&rsquo;s result
             </button>
-          </div>
-        ) : (
-          <div className="daily-card-actions">
+          ) : (
             <button className="btn accent-outline small" onClick={() => startDailyChallenge(false)}>
               Play today's board
             </button>
+          )}
+          {dailyHardLocked ? (
+            <button className="btn ghost small" onClick={() => viewDailyResult(true)}>
+              View hard mode result
+            </button>
+          ) : (
             <button
               className="btn ghost small"
               onClick={() => startDailyChallenge(true)}
-              title="Tiles reveal one at a time, in order — no picking which franchise to draft from next."
+              title="A different 8 franchises, revealed one at a time — no picking which comes next."
             >
               Hard mode
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {firebaseConfigured() && (

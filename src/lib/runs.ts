@@ -37,6 +37,10 @@ export interface Run {
   // hiding the daily card behind "come back tomorrow".
   is_daily: boolean;
   daily_date: string | null;
+  // Hard mode draws from its own separately-seeded board, so it's tracked
+  // as a genuinely different daily run, not just a variant of the normal
+  // one — findDailyRun needs this to fetch the right one back.
+  hard_mode: boolean;
 }
 
 /** Every saved run on this device, most recent first. Local to this browser
@@ -52,7 +56,13 @@ export function loadRuns(): Run[] {
 /** Saves one completed season to this device's run history. Never throws —
  * a failed save (e.g. localStorage disabled/full) should never affect
  * gameplay. */
-export function saveRun(season: SeasonState, filled: FilledSlots, isDaily = false, dailyDate: string | null = null): void {
+export function saveRun(
+  season: SeasonState,
+  filled: FilledSlots,
+  isDaily = false,
+  dailyDate: string | null = null,
+  hardMode = false
+): void {
   try {
     const players: Record<string, DraftedPlayer> = {};
     for (const slot of SLOTS) {
@@ -74,6 +84,7 @@ export function saveRun(season: SeasonState, filled: FilledSlots, isDaily = fals
       players,
       is_daily: isDaily,
       daily_date: isDaily ? dailyDate : null,
+      hard_mode: isDaily && hardMode,
     };
     const runs = [run, ...loadRuns()].slice(0, MAX_RUNS);
     localStorage.setItem(RUNS_KEY, JSON.stringify(runs));
@@ -82,17 +93,19 @@ export function saveRun(season: SeasonState, filled: FilledSlots, isDaily = fals
   }
 }
 
-/** The daily-challenge run saved for a given day (its todayKey()), if this
- *  device has one — lets a player who already played today's board come
- *  back and see that result again instead of it just being gone once they
- *  leave the results screen. Falls back to the single most recent run
- *  saved that same local calendar day if none carries the tag — covers a
- *  run saved by an older build, before is_daily/daily_date existed, that
- *  would otherwise be unfindable forever even though the board was
- *  genuinely played today. */
-export function findDailyRun(dailyDate: string): Run | null {
+/** The daily-challenge run saved for a given day (its todayKey()) and mode,
+ *  if this device has one — lets a player who already played today's board
+ *  come back and see that result again instead of it just being gone once
+ *  they leave the results screen. Falls back to the single most recent run
+ *  saved that same local calendar day if none carries the tag (normal mode
+ *  only — hard mode postdates this fallback's need) — covers a run saved
+ *  by an older build, before is_daily/daily_date existed, that would
+ *  otherwise be unfindable forever even though the board was genuinely
+ *  played today. */
+export function findDailyRun(dailyDate: string, hardMode = false): Run | null {
   const runs = loadRuns();
-  const tagged = runs.find((r) => r.is_daily && r.daily_date === dailyDate);
+  const tagged = runs.find((r) => r.is_daily && r.daily_date === dailyDate && !!r.hard_mode === hardMode);
   if (tagged) return tagged;
+  if (hardMode) return null;
   return runs.find((r) => !r.daily_date && todayKey(new Date(r.created_at)) === dailyDate) ?? null;
 }

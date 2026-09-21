@@ -191,6 +191,21 @@ export function isDraftComplete(filled: FilledSlots): boolean {
   return Object.keys(filled).length >= SLOTS.length;
 }
 
+/** Rehydrates a roster from a plain slotKey -> player id map — the shape
+ *  anything persisting a roster (Firestore, localStorage) actually stores,
+ *  since a full Player object round-trips through JSON fine but there's no
+ *  reason to duplicate the whole player pool everywhere one is saved. */
+export function rosterFromIds(roster: Record<string, number>): FilledSlots {
+  const filled: FilledSlots = {};
+  for (const slot of SLOTS) {
+    const pid = roster[slot.key];
+    if (pid == null) continue;
+    const p = PLAYERS.find((pl) => pl.id === pid);
+    if (p) filled[slot.key] = p;
+  }
+  return filled;
+}
+
 export function rosterStrength(filled: FilledSlots): number {
   let s = 0;
   for (const slot of SLOTS) {

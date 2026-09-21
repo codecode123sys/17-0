@@ -7,6 +7,7 @@ import {
   isDraftComplete,
   respinEra as pickEraSwap,
   respinTeam as pickTeamSwap,
+  rosterFromIds,
   rosterStrength,
   spinRound,
 } from "../engine/draft";
@@ -56,23 +57,75 @@ function saveDevMode(on: boolean) {
 }
 
 // One attempt per calendar day, same as the board itself — stores the date
-// key of the last daily challenge started on this device. Dev mode ignores
-// this so testing doesn't burn the real thing.
+// key of the last daily challenge started on this device. Hard mode is a
+// genuinely different board (see startDailyChallenge), so it gets its own
+// separate lock rather than sharing normal mode's — playing one today
+// doesn't use up the other. Dev mode ignores both so testing doesn't burn
+// the real thing.
 const DAILY_PLAYED_KEY = "seventeen-oh-daily-played";
+const DAILY_HARD_PLAYED_KEY = "seventeen-oh-daily-hard-played";
 
-function loadDailyPlayedDate(): string | null {
+function loadDailyPlayedDate(key: string): string | null {
   try {
-    return localStorage.getItem(DAILY_PLAYED_KEY);
+    return localStorage.getItem(key);
   } catch {
     return null;
   }
 }
-function saveDailyPlayedDate(date: string) {
+function saveDailyPlayedDate(key: string, date: string) {
   try {
-    localStorage.setItem(DAILY_PLAYED_KEY, date);
+    localStorage.setItem(key, date);
   } catch {
     /* ignore */
   }
+}
+
+// A daily draft still in progress — saved after every pick so a reload
+// (a real issue on mobile, where the browser can reload a backgrounded tab
+// on its own) resumes exactly where it left off instead of losing the
+// roster while the day's attempt stays spent. Cleared the moment the
+// roster is complete, since there's nothing left to resume into at that
+// point. Keyed by date, not by mode, since only one draft can be in
+// progress on a device at a time regardless of which mode it's in.
+const DAILY_PROGRESS_KEY = "seventeen-oh-daily-progress";
+
+interface DailyProgress {
+  date: string;
+  hardMode: boolean;
+  board: DailyTile[];
+  usedKeys: string[];
+  selectedKey: string | null;
+  filledIds: Record<string, number>;
+}
+
+function loadDailyProgress(): DailyProgress | null {
+  try {
+    return JSON.parse(localStorage.getItem(DAILY_PROGRESS_KEY) ?? "null");
+  } catch {
+    return null;
+  }
+}
+function saveDailyProgress(p: DailyProgress) {
+  try {
+    localStorage.setItem(DAILY_PROGRESS_KEY, JSON.stringify(p));
+  } catch {
+    /* ignore */
+  }
+}
+function clearDailyProgress() {
+  try {
+    localStorage.removeItem(DAILY_PROGRESS_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+function idsFromRoster(filled: FilledSlots): Record<string, number> {
+  const ids: Record<string, number> = {};
+  for (const slot of SLOTS) {
+    const p = filled[slot.key];
+    if (p) ids[slot.key] = p.id;
+  }
+  return ids;
 }
 
 interface BestRecord {
@@ -165,16 +218,35 @@ export function useGame() {
   const [dailyBestRoster, setDailyBestRoster] = useState<FilledSlots | null>(null);
   const [isDaily, setIsDaily] = useState(false);
   const [dailyPlayedToday, setDailyPlayedToday] = useState(false);
+  const [dailyHardPlayedToday, setDailyHardPlayedToday] = useState(false);
   // Hard mode reveals dailyBoard one tile at a time, in the board's own
   // fixed order, instead of letting you pick which of the 8 to draft from
-  // next — everything else (solvability guard, the board itself) is
-  // identical, so this is purely which tile the UI shows you.
+  // next — and draws from its own separately-seeded board (see
+  // startDailyChallenge), so it's a genuinely different daily puzzle, not
+  // just a different way to look at the same one.
   const [dailyHardMode, setDailyHardMode] = useState(false);
 
   useEffect(() => {
     setBest(loadBest());
     setDevMode(loadDevMode());
-    setDailyPlayedToday(loadDailyPlayedDate() === todayKey());
+    const today = todayKey();
+    setDailyPlayedToday(loadDailyPlayedDate(DAILY_PLAYED_KEY) === today);
+    setDailyHardPlayedToday(loadDailyPlayedDate(DAILY_HARD_PLAYED_KEY) === today);
+
+    // A draft that was still in progress when the tab last closed/reloaded
+    // — put the player right back into it instead of just showing them
+    // locked out with nothing to show for it (see DAILY_PROGRESS_KEY).
+    const progress = loadDailyProgress();
+    if (progress && progress.date === today) {
+      setDailyBoard(progress.board);
+      setDailyUsedKeys(progress.usedKeys);
+      setDailySelectedKey(progress.selectedKey);
+      setDailyHardMode(progress.hardMode);
+      setDailyBestRoster(bestPossibleRoster(progress.board));
+      setFilled(rosterFromIds(progress.filledIds));
+      setIsDaily(true);
+      setScreen("dailyDraft");
+    }
   }, []);
 
   const setMode = useCallback((m: Mode) => setModeState(m), []);
@@ -244,14 +316,19 @@ export function useGame() {
 
   const startDailyChallenge = useCallback(
     (hardMode = false) => {
-      if (dailyPlayedToday && !devMode) return;
+      const alreadyPlayed = hardMode ? dailyHardPlayedToday : dailyPlayedToday;
+      if (alreadyPlayed && !devMode) return;
       const today = todayKey();
-      const board = generateDailyBoard(today);
+      // Hard mode draws from its own separately-seeded board — a genuinely
+      // different 8 franchises, not just a different reveal order of the
+      // same daily puzzle everyone already played in normal mode.
+      const board = generateDailyBoard(hardMode ? `${today}:hard` : today);
+      const selectedKey = hardMode ? board[0].key : null;
       setDailyBoard(board);
       setDailyUsedKeys([]);
       // Hard mode has no tile to click — the first (and, after each pick,
       // the next) tile in the board's own order is selected automatically.
-      setDailySelectedKey(hardMode ? board[0].key : null);
+      setDailySelectedKey(selectedKey);
       setDailyHardMode(hardMode);
       setDailyBestRoster(bestPossibleRoster(board));
       setFilled({});
@@ -263,12 +340,15 @@ export function useGame() {
       setSeasonSummary(null);
       seasonCounted.current = false;
       if (!devMode) {
-        saveDailyPlayedDate(today);
-        setDailyPlayedToday(true);
+        const key = hardMode ? DAILY_HARD_PLAYED_KEY : DAILY_PLAYED_KEY;
+        saveDailyPlayedDate(key, today);
+        if (hardMode) setDailyHardPlayedToday(true);
+        else setDailyPlayedToday(true);
+        saveDailyProgress({ date: today, hardMode, board, usedKeys: [], selectedKey, filledIds: {} });
       }
       setScreen("dailyDraft");
     },
-    [dailyPlayedToday, devMode]
+    [dailyPlayedToday, dailyHardPlayedToday, devMode]
   );
 
   const selectDailyTile = useCallback(
@@ -284,20 +364,35 @@ export function useGame() {
       if (!dailySelectedKey) return;
       const nextFilled: FilledSlots = { ...filled, [slotKey]: player };
       const nextUsedKeys = [...dailyUsedKeys, dailySelectedKey];
-      setFilled(nextFilled);
-      setDailyUsedKeys(nextUsedKeys);
       // Hard mode auto-advances to the next tile in the board's fixed
       // order; normal mode clears the selection so the player picks
       // whichever tile they want next.
-      setDailySelectedKey(dailyHardMode ? (dailyBoard[nextUsedKeys.length]?.key ?? null) : null);
+      const nextSelectedKey = dailyHardMode ? (dailyBoard[nextUsedKeys.length]?.key ?? null) : null;
+      setFilled(nextFilled);
+      setDailyUsedKeys(nextUsedKeys);
+      setDailySelectedKey(nextSelectedKey);
 
-      if (isDraftComplete(nextFilled)) {
+      const complete = isDraftComplete(nextFilled);
+      if (!devMode) {
+        if (complete) clearDailyProgress();
+        else
+          saveDailyProgress({
+            date: todayKey(),
+            hardMode: dailyHardMode,
+            board: dailyBoard,
+            usedKeys: nextUsedKeys,
+            selectedKey: nextSelectedKey,
+            filledIds: idsFromRoster(nextFilled),
+          });
+      }
+
+      if (complete) {
         const strength = rosterStrength(nextFilled);
         setSeason(enterSeason(strength));
         setScreen("season");
       }
     },
-    [filled, dailySelectedKey, dailyUsedKeys, dailyHardMode, dailyBoard]
+    [filled, dailySelectedKey, dailyUsedKeys, dailyHardMode, dailyBoard, devMode]
   );
 
   /** Rebuilds and re-shows today's already-completed daily result from its
@@ -306,10 +401,11 @@ export function useGame() {
    *  projection off the saved roster strength (the projection is a random
    *  sample either way, so a newly drawn one is no less "real" than the one
    *  shown the first time). Silently does nothing if there's no saved run
-   *  for today, which shouldn't happen whenever dailyPlayedToday is true. */
-  const viewDailyResult = useCallback(() => {
+   *  for today in the requested mode, which shouldn't happen whenever that
+   *  mode's own "played today" flag is true. */
+  const viewDailyResult = useCallback((hardMode = false) => {
     const today = todayKey();
-    const run = findDailyRun(today);
+    const run = findDailyRun(today, hardMode);
     if (!run) return;
     const nextFilled: FilledSlots = {};
     for (const slot of SLOTS) {
@@ -321,7 +417,7 @@ export function useGame() {
       if (p) nextFilled[slot.key] = p;
     }
     setFilled(nextFilled);
-    setDailyBestRoster(bestPossibleRoster(generateDailyBoard(today)));
+    setDailyBestRoster(bestPossibleRoster(generateDailyBoard(hardMode ? `${today}:hard` : today)));
     setProjection(simulate(run.strength));
     setSeasonSummary({
       record: `${run.wins}–${run.losses}`,
@@ -330,6 +426,7 @@ export function useGame() {
       seed: run.seed ?? 0,
     });
     setIsDaily(true);
+    setDailyHardMode(hardMode);
     setScreen("results");
   }, []);
 
@@ -367,7 +464,7 @@ export function useGame() {
       bumpPlays();
       setBest(loadBest());
       logSeasonResult(season, filled);
-      saveRun(season, filled, isDaily, isDaily ? todayKey() : null);
+      saveRun(season, filled, isDaily, isDaily ? todayKey() : null, dailyHardMode);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [season?.phase]);
@@ -464,6 +561,7 @@ export function useGame() {
     // daily challenge
     isDaily,
     dailyPlayedToday,
+    dailyHardPlayedToday,
     dailyBoard,
     dailyUsedKeys,
     dailySelectedKey,

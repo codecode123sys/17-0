@@ -47,10 +47,50 @@ describe("findDailyRun", () => {
         players: {},
         is_daily: true,
         daily_date: "2026-09-14",
+        hard_mode: false,
       },
     ]);
     const run = findDailyRun("2026-09-14");
     expect(run?.id).toBe("a");
+  });
+
+  it("keeps normal-mode and hard-mode runs on the same day separate", () => {
+    rawSet([
+      {
+        id: "normal",
+        created_at: "2026-09-14T12:00:00.000Z",
+        strength: 80,
+        wins: 12,
+        losses: 5,
+        seed: 3,
+        division: "AFC East",
+        div_winner: false,
+        result: 2,
+        outcome_text: "Out in the Divisional Round",
+        players: {},
+        is_daily: true,
+        daily_date: "2026-09-14",
+        hard_mode: false,
+      },
+      {
+        id: "hard",
+        created_at: "2026-09-14T13:00:00.000Z",
+        strength: 78,
+        wins: 8,
+        losses: 9,
+        seed: 0,
+        division: "NFC West",
+        div_winner: null,
+        result: 0,
+        outcome_text: "Missed the playoffs",
+        players: {},
+        is_daily: true,
+        daily_date: "2026-09-14",
+        hard_mode: true,
+      },
+    ]);
+    expect(findDailyRun("2026-09-14", false)?.id).toBe("normal");
+    expect(findDailyRun("2026-09-14", true)?.id).toBe("hard");
   });
 
   it("falls back to a same-day run saved before is_daily/daily_date existed", () => {
@@ -139,5 +179,21 @@ describe("saveRun", () => {
     const [run] = loadRuns();
     expect(run.is_daily).toBe(false);
     expect(run.daily_date).toBeNull();
+  });
+
+  it("tags a hard-mode daily run", () => {
+    const season = {
+      strength: 78,
+      wins: 8,
+      losses: 9,
+      seed: 0,
+      division: "NFC West",
+      divWinner: false,
+      divRank: 3,
+      result: 0,
+    } as never;
+    saveRun(season, {}, true, "2026-09-14", true);
+    const [run] = loadRuns();
+    expect(run.hard_mode).toBe(true);
   });
 });

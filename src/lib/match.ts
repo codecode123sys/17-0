@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { PLAYERS } from "../data/players";
 import type { Era, Player } from "../data/players";
-import { ERAS, SLOTS, rosterStrength, targetsFor, teamsForEra, teamsPresentInEra } from "../engine/draft";
+import { ERAS, SLOTS, rosterFromIds, rosterStrength, targetsFor, teamsForEra, teamsPresentInEra } from "../engine/draft";
 import type { FilledSlots } from "../engine/draft";
 import { generateAllTimeBoard, generateDailyBoard, hasPerfectMatching, tileCanFillSlot, tilePlayers } from "../engine/daily";
 import type { DailyTile } from "../engine/daily";
@@ -309,16 +309,7 @@ export function subscribeRoom(code: string, cb: (match: MatchDoc | null) => void
   return onSnapshot(ref, (snap) => cb(snap.exists() ? (snap.data() as MatchDoc) : null));
 }
 
-export function rosterFromIds(roster: Record<string, number>): FilledSlots {
-  const filled: FilledSlots = {};
-  for (const slot of SLOTS) {
-    const pid = roster[slot.key];
-    if (pid == null) continue;
-    const p = PLAYERS.find((pl) => pl.id === pid);
-    if (p) filled[slot.key] = p;
-  }
-  return filled;
-}
+export { rosterFromIds };
 
 /** The tile a given player actually faces at a given round — their own
  *  board (see boardFor — identical to their opponent's in sameBoard

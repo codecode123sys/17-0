@@ -25,7 +25,13 @@ export function buildDailyShareText(
   hardMode: boolean
 ): string {
   const status = compareToOptimal(filled, best);
-  const squares = SLOTS.map((s) => STATUS_EMOJI[status[s.key] ?? "incorrect"]).join("");
+  // Each slot's own key (QB, RB1, RB2, WR1, WR2, TE, FLEX, DEF) next to its
+  // square — the shared label ("RB", "WR") alone couldn't tell RB1 and RB2
+  // apart, and the whole point of the grid is reading it at a glance
+  // without having to count positions in from the left. Two rows of 4,
+  // same grouping as the roster itself everywhere else it's shown.
+  const pairs = SLOTS.map((s) => `${s.key} ${STATUS_EMOJI[status[s.key] ?? "incorrect"]}`);
+  const grid = [pairs.slice(0, 4).join("  "), pairs.slice(4, 8).join("  ")].join("\n");
   const matched = Object.values(status).filter((s) => s === "matched").length;
   const pct = Math.round((matched / SLOTS.length) * 100);
   const dateLabel = new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -33,7 +39,7 @@ export function buildDailyShareText(
   return [
     `17–0 Daily${hardMode ? " (Hard)" : ""} — ${dateLabel}`,
     "",
-    squares,
+    grid,
     "",
     `${matched}/${SLOTS.length} optimal (${pct}%)`,
     `${record} · ${outcomeText}`,

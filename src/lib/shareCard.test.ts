@@ -16,14 +16,16 @@ describe("buildDailyShareText", () => {
     expect(text).not.toContain("Manning");
   });
 
-  it("renders one colored square per slot, matched ones green", () => {
+  it("renders one labeled, colored square per slot across two rows, matched ones green", () => {
     const p = player(1, "Same Guy");
     const filled: FilledSlots = { QB: p };
     const best: FilledSlots = { QB: p };
     const text = buildDailyShareText(filled, best, "13–4", "Lost the Super Bowl", false);
-    const squareLine = text.split("\n")[2];
-    expect(squareLine).toContain("🟩");
-    expect([...squareLine].length).toBe(8); // one square per SLOTS entry
+    const [row1, row2] = text.split("\n").slice(2, 4);
+    expect(row1).toContain("QB 🟩");
+    // 8 slots total, split 4/4 across the two rows, each with its own label.
+    for (const key of ["QB", "RB1", "RB2", "WR1"]) expect(row1).toContain(key);
+    for (const key of ["WR2", "TE", "FLEX", "DEF"]) expect(row2).toContain(key);
   });
 
   it("tags hard mode in the header", () => {

@@ -6,7 +6,7 @@ import { PlayerPortrait } from "../components/PlayerPortrait";
 import { TeamBadge } from "../components/TeamBadge";
 import { WinDistributionChart } from "../components/WinDistributionChart";
 import { PlayoffLadder } from "../components/PlayoffLadder";
-import { buildDailyShareText, renderResultCard } from "../lib/shareCard";
+import { buildDailyShareText } from "../lib/shareCard";
 import type { GameController } from "../state/useGame";
 
 export function Results({ game }: { game: GameController }) {
@@ -32,80 +32,29 @@ export function Results({ game }: { game: GameController }) {
   const myStatus = dailyBestRoster ? compareToOptimal(filled, dailyBestRoster) : {};
   const optimalStatus = dailyBestRoster ? compareToOptimal(dailyBestRoster, filled) : {};
 
-  async function copyResult() {
-    const lines = ["17–0  —  my all-time NFL roster", ""];
-    for (const s of SLOTS) {
-      const p = filled[s.key];
-      if (p) lines.push(`${s.label}: ${p.name} (${p.team}, ${p.era})`);
-    }
-    lines.push("");
-    lines.push(`Season: ${sum.record} — ${sum.outcomeText}`);
-    lines.push(`Preseason model: ${r.meanWins.toFixed(1)}-win average, ${fmtPct(r.winSBPct)} to win the Super Bowl`);
-    lines.push(`Roster strength: ${r.strength.toFixed(1)}`);
-    const text = lines.join("\n");
+  /** Copies a shareable summary to the clipboard — never the actual
+   *  players drafted, on any mode. For daily results that's the
+   *  Wordle/Poeltl-style spoiler-free grid (see buildDailyShareText); the
+   *  whole point of sharing a daily result is comparing performance with
+   *  someone who hasn't played today's board yet, which a roster listing
+   *  would spoil outright. */
+  async function share() {
+    const text =
+      isDaily && dailyBestRoster
+        ? buildDailyShareText(filled, dailyBestRoster, sum.record, sum.outcomeText, dailyHardMode)
+        : [
+            `17–0 — ${sum.record}`,
+            sum.outcomeText,
+            `Roster strength: ${r.strength.toFixed(1)}`,
+            `Preseason model: ${r.meanWins.toFixed(1)}-win average, ${fmtPct(r.winSBPct)} to win the Super Bowl`,
+            "",
+            "draft17-0.com",
+          ].join("\n");
     try {
       await navigator.clipboard.writeText(text);
       setToast("Copied to clipboard.");
     } catch {
       setToast("Couldn’t copy — select and copy manually.");
-    }
-  }
-
-  /** Shares (or otherwise hands off) a rendered image of the result card —
-   *  a plain text blob doesn't spread on social platforms the way an
-   *  actual image does, and every fallback here still ends with the player
-   *  holding a shareable PNG one way or another. Tries, in order: the
-   *  native share sheet (best on mobile — posts straight into whatever
-   *  app they pick), then copying the image to the clipboard (best on
-   *  desktop — paste straight into a tweet/reply), then a plain download
-   *  if neither API is available. */
-  async function shareImage() {
-    try {
-      const blob = await renderResultCard({
-        filled,
-        record: sum.record,
-        outcomeText: sum.outcomeText,
-        isDaily,
-        dailyBestRoster: isDaily ? dailyBestRoster : null,
-      });
-      const file = new File([blob], "17-0-result.png", { type: "image/png" });
-      // A spoiler-free grid + stats for daily results — the image itself
-      // still shows full names, but this caption (what the native share
-      // sheet actually posts alongside it, e.g. as a tweet's text) doesn't,
-      // so it's safe to post somewhere a friend who hasn't played today
-      // yet might see it.
-      const caption =
-        isDaily && dailyBestRoster
-          ? buildDailyShareText(filled, dailyBestRoster, sum.record, sum.outcomeText, dailyHardMode)
-          : `17–0 — ${sum.record}, ${sum.outcomeText}\ndraft17-0.com`;
-
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: "17–0", text: caption });
-        return;
-      }
-      if (window.ClipboardItem && navigator.clipboard.write) {
-        try {
-          await navigator.clipboard.write([
-            new ClipboardItem({ "image/png": blob, "text/plain": new Blob([caption], { type: "text/plain" }) }),
-          ]);
-        } catch {
-          // Multi-type clipboard writes aren't supported everywhere — an
-          // image-only item is still useful on its own.
-          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-        }
-        setToast("Image copied — paste it anywhere.");
-        return;
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "17-0-result.png";
-      a.click();
-      URL.revokeObjectURL(url);
-      setToast("Image downloaded.");
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return; // user cancelled the share sheet
-      setToast("Couldn’t create the image on this browser.");
     }
   }
 
@@ -239,11 +188,8 @@ export function Results({ game }: { game: GameController }) {
             Draft again
           </button>
         )}
-        <button className="btn ghost" onClick={shareImage}>
-          Share image
-        </button>
-        <button className="btn ghost" onClick={copyResult}>
-          Copy result
+        <button className="btn ghost" onClick={share}>
+          Share
         </button>
       </div>
       <div className="toast">{toast}</div>

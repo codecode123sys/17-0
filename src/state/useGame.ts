@@ -165,6 +165,11 @@ export function useGame() {
   const [dailyBestRoster, setDailyBestRoster] = useState<FilledSlots | null>(null);
   const [isDaily, setIsDaily] = useState(false);
   const [dailyPlayedToday, setDailyPlayedToday] = useState(false);
+  // Hard mode reveals dailyBoard one tile at a time, in the board's own
+  // fixed order, instead of letting you pick which of the 8 to draft from
+  // next — everything else (solvability guard, the board itself) is
+  // identical, so this is purely which tile the UI shows you.
+  const [dailyHardMode, setDailyHardMode] = useState(false);
 
   useEffect(() => {
     setBest(loadBest());
@@ -237,32 +242,42 @@ export function useGame() {
     [filled, usedEras, spin, applyFreshSpin, devMode]
   );
 
-  const startDailyChallenge = useCallback(() => {
-    if (dailyPlayedToday && !devMode) return;
-    const today = todayKey();
-    const board = generateDailyBoard(today);
-    setDailyBoard(board);
-    setDailyUsedKeys([]);
-    setDailySelectedKey(null);
-    setDailyBestRoster(bestPossibleRoster(board));
-    setFilled({});
-    setUsedEras([]);
-    setIsDaily(true);
-    setSeason(null);
-    setAutoplay(false);
-    setProjection(null);
-    setSeasonSummary(null);
-    seasonCounted.current = false;
-    if (!devMode) {
-      saveDailyPlayedDate(today);
-      setDailyPlayedToday(true);
-    }
-    setScreen("dailyDraft");
-  }, [dailyPlayedToday, devMode]);
+  const startDailyChallenge = useCallback(
+    (hardMode = false) => {
+      if (dailyPlayedToday && !devMode) return;
+      const today = todayKey();
+      const board = generateDailyBoard(today);
+      setDailyBoard(board);
+      setDailyUsedKeys([]);
+      // Hard mode has no tile to click — the first (and, after each pick,
+      // the next) tile in the board's own order is selected automatically.
+      setDailySelectedKey(hardMode ? board[0].key : null);
+      setDailyHardMode(hardMode);
+      setDailyBestRoster(bestPossibleRoster(board));
+      setFilled({});
+      setUsedEras([]);
+      setIsDaily(true);
+      setSeason(null);
+      setAutoplay(false);
+      setProjection(null);
+      setSeasonSummary(null);
+      seasonCounted.current = false;
+      if (!devMode) {
+        saveDailyPlayedDate(today);
+        setDailyPlayedToday(true);
+      }
+      setScreen("dailyDraft");
+    },
+    [dailyPlayedToday, devMode]
+  );
 
-  const selectDailyTile = useCallback((key: string) => {
-    setDailySelectedKey((prev) => (prev === key ? null : key));
-  }, []);
+  const selectDailyTile = useCallback(
+    (key: string) => {
+      if (dailyHardMode) return; // tiles advance automatically, not by clicking
+      setDailySelectedKey((prev) => (prev === key ? null : key));
+    },
+    [dailyHardMode]
+  );
 
   const chooseDaily = useCallback(
     (player: Player, slotKey: string) => {
@@ -271,7 +286,10 @@ export function useGame() {
       const nextUsedKeys = [...dailyUsedKeys, dailySelectedKey];
       setFilled(nextFilled);
       setDailyUsedKeys(nextUsedKeys);
-      setDailySelectedKey(null);
+      // Hard mode auto-advances to the next tile in the board's fixed
+      // order; normal mode clears the selection so the player picks
+      // whichever tile they want next.
+      setDailySelectedKey(dailyHardMode ? (dailyBoard[nextUsedKeys.length]?.key ?? null) : null);
 
       if (isDraftComplete(nextFilled)) {
         const strength = rosterStrength(nextFilled);
@@ -279,7 +297,7 @@ export function useGame() {
         setScreen("season");
       }
     },
-    [filled, dailySelectedKey, dailyUsedKeys]
+    [filled, dailySelectedKey, dailyUsedKeys, dailyHardMode, dailyBoard]
   );
 
   /** Rebuilds and re-shows today's already-completed daily result from its
@@ -450,6 +468,7 @@ export function useGame() {
     dailyUsedKeys,
     dailySelectedKey,
     dailyBestRoster,
+    dailyHardMode,
     startDailyChallenge,
     selectDailyTile,
     chooseDaily,

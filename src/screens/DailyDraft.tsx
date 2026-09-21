@@ -8,7 +8,7 @@ import { TeamBadge } from "../components/TeamBadge";
 import type { GameController } from "../state/useGame";
 
 export function DailyDraft({ game }: { game: GameController }) {
-  const { filled, dailyBoard, dailyUsedKeys, dailySelectedKey, selectDailyTile, chooseDaily } = game;
+  const { filled, dailyBoard, dailyUsedKeys, dailySelectedKey, dailyHardMode, selectDailyTile, chooseDaily } = game;
 
   const round = dailyUsedKeys.length;
   const open = openSlots(filled);
@@ -47,40 +47,61 @@ export function DailyDraft({ game }: { game: GameController }) {
         ))}
       </div>
 
-      <p className="pick-hint">
-        Today&rsquo;s board — same 8 franchises for everyone. Pick a tile to see its roster, blind, then draft one
-        player into an open slot.
-      </p>
+      {dailyHardMode ? (
+        <p className="pick-hint">
+          Hard mode — franchises reveal one at a time, in order. You won&rsquo;t know who&rsquo;s next until you&rsquo;ve
+          drafted from this one.
+        </p>
+      ) : (
+        <p className="pick-hint">
+          Today&rsquo;s board — same 8 franchises for everyone. Pick a tile to see its roster, blind, then draft one
+          player into an open slot.
+        </p>
+      )}
 
-      <div className="daily-board" role="group" aria-label="Today's tiles">
-        {dailyBoard.map((tile) => {
-          const used = usedSet.has(tile.key);
-          const active = tile.key === dailySelectedKey;
-          const m = badgeFor(tile.team);
-          const style = { "--c1": m.primary, "--c2": m.secondary } as CSSProperties;
-          return (
-            <button
-              key={tile.key}
-              type="button"
-              className={"tile" + (used ? " used" : "") + (active ? " active" : "")}
-              disabled={used}
-              onClick={() => selectDailyTile(tile.key)}
-            >
-              <div className="tile-swatch" style={style}>
-                <span className="tile-abbr">{m.abbr}</span>
-                {used && <span className="tile-check">Drafted</span>}
-              </div>
-              <div className="tile-body">
-                <span className="tile-team">{tile.team}</span>
-                <span className="tile-era">{tile.era}</span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      {dailyHardMode ? (
+        <div className="daily-board hard" role="group" aria-label="Today's tiles (hidden order)">
+          {dailyBoard.map((tile, i) => (
+            <div key={tile.key} className={"tile-pip" + (i < round ? " done" : i === round ? " now" : "")} />
+          ))}
+        </div>
+      ) : (
+        <div className="daily-board" role="group" aria-label="Today's tiles">
+          {dailyBoard.map((tile) => {
+            const used = usedSet.has(tile.key);
+            const active = tile.key === dailySelectedKey;
+            const m = badgeFor(tile.team);
+            const style = { "--c1": m.primary, "--c2": m.secondary } as CSSProperties;
+            return (
+              <button
+                key={tile.key}
+                type="button"
+                className={"tile" + (used ? " used" : "") + (active ? " active" : "")}
+                disabled={used}
+                onClick={() => selectDailyTile(tile.key)}
+              >
+                <div className="tile-swatch" style={style}>
+                  <span className="tile-abbr">{m.abbr}</span>
+                  {used && <span className="tile-check">Drafted</span>}
+                </div>
+                <div className="tile-body">
+                  <span className="tile-team">{tile.team}</span>
+                  <span className="tile-era">{tile.era}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {selectedTile && (
         <>
+          {dailyHardMode && (
+            <div className="daily-reveal">
+              <TeamBadge team={selectedTile.team} /> <span className="daily-reveal-team">{selectedTile.team}</span>
+              <span className="daily-reveal-era">{selectedTile.era}</span>
+            </div>
+          )}
           <p className="pick-hint">
             {cards.length
               ? "Every player you can actually draft right now, blind — pick one into an open slot."

@@ -830,6 +830,40 @@
     letter-spacing: .03em;
   }
 
+  /* Hard mode: no clickable tiles (nothing to reveal ahead of time), just
+   * a row of blank pips tracking progress through the hidden order. */
+  .daily-board.hard {
+    display: flex;
+    gap: 8px;
+    grid-template-columns: none;
+  }
+  .tile-pip {
+    flex: 1;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+  }
+  .tile-pip.done { background: var(--muted); border-color: var(--muted); }
+  .tile-pip.now { background: var(--accent); border-color: var(--accent-strong); }
+
+  .daily-reveal {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .daily-reveal-team {
+    font-family: "Oswald", sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+  }
+  .daily-reveal-era {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
   .roster {
     margin-top: 26px;
     border-top: 1px solid var(--line);

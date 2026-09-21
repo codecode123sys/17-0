@@ -157,9 +157,18 @@ export function Title({ game }: { game: GameController }) {
             </button>
           </div>
         ) : (
-          <button className="btn accent-outline small" onClick={startDailyChallenge}>
-            Play today's board
-          </button>
+          <div className="daily-card-actions">
+            <button className="btn accent-outline small" onClick={() => startDailyChallenge(false)}>
+              Play today's board
+            </button>
+            <button
+              className="btn ghost small"
+              onClick={() => startDailyChallenge(true)}
+              title="Tiles reveal one at a time, in order — no picking which franchise to draft from next."
+            >
+              Hard mode
+            </button>
+          </div>
         )}
       </div>
 

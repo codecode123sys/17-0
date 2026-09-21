@@ -6,11 +6,11 @@ import { PlayerPortrait } from "../components/PlayerPortrait";
 import { TeamBadge } from "../components/TeamBadge";
 import { WinDistributionChart } from "../components/WinDistributionChart";
 import { PlayoffLadder } from "../components/PlayoffLadder";
-import { renderResultCard } from "../lib/shareCard";
+import { buildDailyShareText, renderResultCard } from "../lib/shareCard";
 import type { GameController } from "../state/useGame";
 
 export function Results({ game }: { game: GameController }) {
-  const { filled, mode, projection, seasonSummary, draftAgain, isDaily, dailyBestRoster, goHome } = game;
+  const { filled, mode, projection, seasonSummary, draftAgain, isDaily, dailyBestRoster, dailyHardMode, goHome } = game;
   const [toast, setToast] = useState("");
   // Which full roster the daily comparison panel is currently showing —
   // your own, or the optimal one — rather than trying to cram both into
@@ -69,13 +69,30 @@ export function Results({ game }: { game: GameController }) {
         dailyBestRoster: isDaily ? dailyBestRoster : null,
       });
       const file = new File([blob], "17-0-result.png", { type: "image/png" });
+      // A spoiler-free grid + stats for daily results — the image itself
+      // still shows full names, but this caption (what the native share
+      // sheet actually posts alongside it, e.g. as a tweet's text) doesn't,
+      // so it's safe to post somewhere a friend who hasn't played today
+      // yet might see it.
+      const caption =
+        isDaily && dailyBestRoster
+          ? buildDailyShareText(filled, dailyBestRoster, sum.record, sum.outcomeText, dailyHardMode)
+          : `17–0 — ${sum.record}, ${sum.outcomeText}\ndraft17-0.com`;
 
       if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: "17–0", text: "My all-time NFL roster" });
+        await navigator.share({ files: [file], title: "17–0", text: caption });
         return;
       }
       if (window.ClipboardItem && navigator.clipboard.write) {
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ "image/png": blob, "text/plain": new Blob([caption], { type: "text/plain" }) }),
+          ]);
+        } catch {
+          // Multi-type clipboard writes aren't supported everywhere — an
+          // image-only item is still useful on its own.
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        }
         setToast("Image copied — paste it anywhere.");
         return;
       }

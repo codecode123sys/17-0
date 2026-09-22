@@ -12,17 +12,19 @@ const STATUS_EMOJI: Record<SlotCompareStatus, string> = {
 /** A Wordle/Poeltl-style spoiler-free share caption for a daily result —
  *  one colored square per slot (green = right player, right slot; yellow =
  *  right player, wrong slot; black = not in the optimal roster at all)
- *  plus the headline stats, but never a player's actual name, so it's
- *  safe to post somewhere a friend who hasn't played today yet might see
- *  it. The whole point of sharing a daily result is comparing performance
- *  with someone who hasn't played yet — listing the actual roster would
- *  spoil that outright. */
+ *  plus the headline stats (record, outcome, roster strength), but never a
+ *  player's actual name, so it's safe to post somewhere a friend who
+ *  hasn't played today yet might see it. The whole point of sharing a
+ *  daily result is comparing performance with someone who hasn't played
+ *  yet — listing the actual roster would spoil that outright, but a bare
+ *  strength number doesn't give anything about the picks themselves away. */
 export function buildDailyShareText(
   filled: FilledSlots,
   best: FilledSlots,
   record: string,
   outcomeText: string,
-  hardMode: boolean
+  hardMode: boolean,
+  strength: number
 ): string {
   const status = compareToOptimal(filled, best);
   // Each slot's own key (QB, RB1, RB2, WR1, WR2, TE, FLEX, DEF) next to its
@@ -43,6 +45,7 @@ export function buildDailyShareText(
     "",
     `${matched}/${SLOTS.length} optimal (${pct}%)`,
     `${record} · ${outcomeText}`,
+    `Roster strength: ${strength.toFixed(1)}`,
     "",
     "draft17-0.com",
   ].join("\n");

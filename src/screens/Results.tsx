@@ -41,7 +41,7 @@ export function Results({ game }: { game: GameController }) {
   async function share() {
     const text =
       isDaily && dailyBestRoster
-        ? buildDailyShareText(filled, dailyBestRoster, sum.record, sum.outcomeText, dailyHardMode)
+        ? buildDailyShareText(filled, dailyBestRoster, sum.record, sum.outcomeText, dailyHardMode, r.strength)
         : [
             `17–0 — ${sum.record}`,
             sum.outcomeText,

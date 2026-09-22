@@ -12,7 +12,7 @@ describe("buildDailyShareText", () => {
     const p = player(1, "Peyton Manning");
     const filled: FilledSlots = { QB: p };
     const best: FilledSlots = { QB: p };
-    const text = buildDailyShareText(filled, best, "13–4", "Lost the Super Bowl", false);
+    const text = buildDailyShareText(filled, best, "13–4", "Lost the Super Bowl", false, 91.4);
     expect(text).not.toContain("Manning");
   });
 
@@ -20,7 +20,7 @@ describe("buildDailyShareText", () => {
     const p = player(1, "Same Guy");
     const filled: FilledSlots = { QB: p };
     const best: FilledSlots = { QB: p };
-    const text = buildDailyShareText(filled, best, "13–4", "Lost the Super Bowl", false);
+    const text = buildDailyShareText(filled, best, "13–4", "Lost the Super Bowl", false, 91.4);
     const [row1, row2] = text.split("\n").slice(2, 4);
     expect(row1).toContain("QB 🟩");
     // 8 slots total, split 4/4 across the two rows, each with its own label.
@@ -29,7 +29,12 @@ describe("buildDailyShareText", () => {
   });
 
   it("tags hard mode in the header", () => {
-    const text = buildDailyShareText({}, {}, "0–17", "Missed the playoffs", true);
+    const text = buildDailyShareText({}, {}, "0–17", "Missed the playoffs", true, 78.2);
     expect(text.split("\n")[0]).toContain("Hard");
+  });
+
+  it("includes the roster strength", () => {
+    const text = buildDailyShareText({}, {}, "13–4", "Lost the Super Bowl", false, 91.4);
+    expect(text).toContain("Roster strength: 91.4");
   });
 });

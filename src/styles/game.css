@@ -346,6 +346,12 @@
     font-size: 11px;
     color: var(--muted);
   }
+  .daily-card-streak {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent-strong);
+  }
   .daily-card-actions {
     display: flex;
     flex-wrap: wrap;
@@ -1087,8 +1093,8 @@
   }
   .drive-row {
     display: flex;
-    justify-content: space-between;
-    gap: 10px;
+    flex-direction: column;
+    gap: 3px;
     padding: 7px 12px;
     background: var(--surface);
     border: 1px solid var(--line);
@@ -1099,6 +1105,7 @@
     opacity: 0;
     animation: driveIn .25s ease forwards;
   }
+  .drive-row-main { display: flex; justify-content: space-between; gap: 10px; }
   .drive-row.mine { border-left-color: var(--accent-strong); }
   .drive-row.theirs { border-left-color: var(--muted); }
   /* Only the non-left sides, so a scored row still shows which team's
@@ -1112,6 +1119,12 @@
   }
   .drive-row .who { color: var(--muted); }
   .drive-row .what { color: var(--ink); }
+  .drive-row .flavor {
+    font-family: "Public Sans", sans-serif;
+    font-style: italic;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
   @keyframes driveIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) {
     .drive-row { animation: none; opacity: 1; }

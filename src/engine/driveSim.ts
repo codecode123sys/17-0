@@ -1,4 +1,5 @@
 import { shuffle } from "./season";
+import type { FilledSlots } from "./draft";
 
 export type DriveTeam = "host" | "guest";
 
@@ -187,4 +188,40 @@ export function deriveDrivePath(driveIndex: number, ev: DriveEvent): number[] {
 
   if (ev.points === 3) path.push(100); // the kick itself, through the uprights
   return path;
+}
+
+const SKILL_KEYS = ["RB1", "RB2", "WR1", "WR2", "TE", "FLEX"];
+
+/** A one-line flavor credit naming who made this drive's play, for the
+ * drive log — e.g. "Jerry Rice punches it in!" instead of just
+ * "Touchdown." Purely cosmetic narration layered on an already-decided
+ * event, same spirit as deriveDrivePath: seeded off the drive's own index
+ * (a different constant twist than deriveDrivePath's seed, so the two
+ * don't happen to pick correlated outcomes) so both clients derive the
+ * identical credit independently. `ownRoster` is the team this event's
+ * points belong to; `oppRoster` is the other side — a takeaway
+ * (interception/fumble) is `ev.team` losing the ball, so that credit
+ * belongs to the opponent's defense, not their own. Returns null for
+ * plays with nothing meaningful to attribute (field goals — this roster
+ * has no kicker position — and generic non-takeaway punts). */
+export function driveFlavor(driveIndex: number, ev: DriveEvent, ownRoster: FilledSlots, oppRoster: FilledSlots): string | null {
+  const rand = mulberry32(driveIndex * 104729 + ev.points * 17 + (ev.team === "host" ? 1 : 0) + 7);
+
+  if (ev.points >= 6) {
+    const keys = SKILL_KEYS.filter((k) => ownRoster[k]);
+    if (!keys.length) return null;
+    const scorer = ownRoster[keys[Math.floor(rand() * keys.length)]]!;
+    const qb = ownRoster.QB;
+    if ((scorer.pos === "WR" || scorer.pos === "TE") && qb) return `${qb.name} finds ${scorer.name} for the score!`;
+    return `${scorer.name} punches it in!`;
+  }
+  if (ev.points === 2) {
+    const def = ownRoster.DEF;
+    return def ? `${def.name} comes up with a safety!` : null;
+  }
+  if (ev.label === "Interception" || ev.label === "Fumble lost") {
+    const def = oppRoster.DEF;
+    return def ? `${def.name} comes up with the takeaway!` : null;
+  }
+  return null;
 }

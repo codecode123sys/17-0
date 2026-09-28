@@ -25,6 +25,7 @@ export function Title({ game }: { game: GameController }) {
     startDailyChallenge,
     dailyPlayedToday,
     dailyHardPlayedToday,
+    dailyStreak,
     viewDailyResult,
     viewHeadToHead,
   } = game;
@@ -147,6 +148,11 @@ export function Title({ game }: { game: GameController }) {
       <div className="daily-card">
         <div className="daily-card-head">
           <span className="daily-card-tag">Daily challenge</span>
+          {dailyStreak.current > 0 && (
+            <span className="daily-card-streak" title={`Best streak: ${dailyStreak.best}`}>
+              🔥 {dailyStreak.current}
+            </span>
+          )}
           <span className="daily-card-date">{today}</span>
         </div>
         <div className="daily-card-actions">

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import type { FilledSlots } from "../engine/draft";
 import { SLOTS } from "../engine/draft";
-import { REGULATION_DRIVES_PER_TEAM, deriveDrivePath } from "../engine/driveSim";
+import { REGULATION_DRIVES_PER_TEAM, deriveDrivePath, driveFlavor } from "../engine/driveSim";
 import { badgeFor } from "../engine/visuals";
 import { firebaseConfigured } from "../lib/firebaseConfig";
 import { getUid } from "../lib/firebase";
@@ -607,17 +607,22 @@ function GameReveal({
 
         <div className="drive-log">
           {recent.map((ev, i) => {
+            const absIdx = played.length - recent.length + i;
             const mine = (ev.team === "host") === iAmHost;
+            const flavor = driveFlavor(absIdx, ev, mine ? myFilled : oppFilled, mine ? oppFilled : myFilled);
             return (
               <div
-                key={played.length - recent.length + i}
+                key={absIdx}
                 className={"drive-row" + (ev.points > 0 ? " scored" : "") + (mine ? " mine" : " theirs")}
               >
-                <span className="who">{mine ? "You" : otherName}</span>
-                <span className="what">
-                  {ev.label}
-                  {ev.overtime && " · OT"}
-                </span>
+                <div className="drive-row-main">
+                  <span className="who">{mine ? "You" : otherName}</span>
+                  <span className="what">
+                    {ev.label}
+                    {ev.overtime && " · OT"}
+                  </span>
+                </div>
+                {flavor && <span className="flavor">{flavor}</span>}
               </div>
             );
           })}

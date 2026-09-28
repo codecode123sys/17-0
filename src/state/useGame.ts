@@ -128,6 +128,38 @@ function idsFromRoster(filled: FilledSlots): Record<string, number> {
   return ids;
 }
 
+// Wordle-style daily streak — counts a calendar day once a daily challenge
+// (either mode) is actually completed that day, not just started. Grows by
+// one if the last counted day was yesterday, resets to one on any gap, and
+// no-ops if today's already been counted (so playing both modes the same
+// day doesn't double-count it).
+const DAILY_STREAK_KEY = "seventeen-oh-daily-streak";
+
+interface DailyStreak {
+  current: number;
+  best: number;
+  lastPlayedDate: string | null;
+}
+
+function loadDailyStreak(): DailyStreak {
+  try {
+    return JSON.parse(localStorage.getItem(DAILY_STREAK_KEY) ?? "null") ?? { current: 0, best: 0, lastPlayedDate: null };
+  } catch {
+    return { current: 0, best: 0, lastPlayedDate: null };
+  }
+}
+function saveDailyStreak(s: DailyStreak) {
+  try {
+    localStorage.setItem(DAILY_STREAK_KEY, JSON.stringify(s));
+  } catch {
+    /* ignore */
+  }
+}
+function yesterdayOf(dateKey: string): string {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return todayKey(new Date(y, m - 1, d - 1));
+}
+
 interface BestRecord {
   record?: string;
   wins?: number;
@@ -225,6 +257,7 @@ export function useGame() {
   // startDailyChallenge), so it's a genuinely different daily puzzle, not
   // just a different way to look at the same one.
   const [dailyHardMode, setDailyHardMode] = useState(false);
+  const [dailyStreak, setDailyStreak] = useState<{ current: number; best: number }>({ current: 0, best: 0 });
 
   useEffect(() => {
     setBest(loadBest());
@@ -232,6 +265,8 @@ export function useGame() {
     const today = todayKey();
     setDailyPlayedToday(loadDailyPlayedDate(DAILY_PLAYED_KEY) === today);
     setDailyHardPlayedToday(loadDailyPlayedDate(DAILY_HARD_PLAYED_KEY) === today);
+    const streak = loadDailyStreak();
+    setDailyStreak({ current: streak.current, best: streak.best });
 
     // A draft that was still in progress when the tab last closed/reloaded
     // — put the player right back into it instead of just showing them
@@ -465,6 +500,14 @@ export function useGame() {
       setBest(loadBest());
       logSeasonResult(season, filled);
       saveRun(season, filled, isDaily, isDaily ? todayKey() : null, dailyHardMode);
+      if (isDaily) {
+        const today = todayKey();
+        const prev = loadDailyStreak();
+        const current = prev.lastPlayedDate === today ? prev.current : prev.lastPlayedDate === yesterdayOf(today) ? prev.current + 1 : 1;
+        const next = { current, best: Math.max(prev.best, current), lastPlayedDate: today };
+        saveDailyStreak(next);
+        setDailyStreak({ current: next.current, best: next.best });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [season?.phase]);
@@ -567,6 +610,7 @@ export function useGame() {
     dailySelectedKey,
     dailyBestRoster,
     dailyHardMode,
+    dailyStreak,
     startDailyChallenge,
     selectDailyTile,
     chooseDaily,

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { REGULATION_DRIVES_PER_TEAM, deriveDrivePath, simulateDriveSequence } from "./driveSim";
+import { REGULATION_DRIVES_PER_TEAM, deriveDrivePath, driveFlavor, simulateDriveSequence } from "./driveSim";
 import type { DriveEvent } from "./driveSim";
+import type { FilledSlots } from "./draft";
+import type { Player } from "../data/players";
 
 describe("simulateDriveSequence", () => {
   it("ends at exactly the given final score, for a range of real scores", () => {
@@ -162,5 +164,58 @@ describe("deriveDrivePath", () => {
         }
       }
     }
+  });
+});
+
+describe("driveFlavor", () => {
+  const p = (id: number, name: string, pos: Player["pos"]): Player => ({
+    id,
+    name,
+    team: "Colts",
+    era: "2000s",
+    pos,
+    ovr: 90,
+    stats: "",
+    accolades: "",
+  });
+  const roster: FilledSlots = {
+    QB: p(1, "Passer Prime", "QB"),
+    RB1: p(2, "Runner One", "RB"),
+    WR1: p(3, "Catcher One", "WR"),
+    DEF: p(4, "Stopper", "DEF"),
+  };
+  const oppRoster: FilledSlots = {
+    QB: p(5, "Opp QB", "QB"),
+    DEF: p(6, "Opp Stopper", "DEF"),
+  };
+
+  const td: DriveEvent = { team: "host", label: "Touchdown", points: 7, hostScore: 7, guestScore: 0, overtime: false };
+  const safety: DriveEvent = { team: "host", label: "Safety", points: 2, hostScore: 2, guestScore: 0, overtime: false };
+  const pick: DriveEvent = { team: "host", label: "Interception", points: 0, hostScore: 0, guestScore: 0, overtime: false };
+  const punt: DriveEvent = { team: "host", label: "Punt", points: 0, hostScore: 0, guestScore: 0, overtime: false };
+  const fg: DriveEvent = { team: "host", label: "Field goal", points: 3, hostScore: 3, guestScore: 0, overtime: false };
+
+  it("credits a touchdown to a skill player on the scoring team's own roster", () => {
+    const text = driveFlavor(0, td, roster, oppRoster);
+    expect(text).toMatch(/Runner One|Catcher One/);
+  });
+
+  it("credits a safety to the scoring team's own defense", () => {
+    expect(driveFlavor(0, safety, roster, oppRoster)).toContain("Stopper");
+    expect(driveFlavor(0, safety, roster, oppRoster)).not.toContain("Opp Stopper");
+  });
+
+  it("credits a takeaway to the OPPONENT's defense, not the team that lost the ball", () => {
+    const text = driveFlavor(0, pick, roster, oppRoster);
+    expect(text).toContain("Opp Stopper");
+  });
+
+  it("gives no flavor for a plain punt or a field goal", () => {
+    expect(driveFlavor(0, punt, roster, oppRoster)).toBeNull();
+    expect(driveFlavor(0, fg, roster, oppRoster)).toBeNull();
+  });
+
+  it("is deterministic for the same drive index and event", () => {
+    expect(driveFlavor(3, td, roster, oppRoster)).toBe(driveFlavor(3, td, roster, oppRoster));
   });
 });
